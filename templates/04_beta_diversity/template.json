@@ -1,0 +1,34 @@
+{
+  "name": "Beta 多样性",
+  "description": "计算 NMDS、PCoA 等 beta 多样性，并生成排序图",
+  "type": "beta",
+  "params": [
+    {
+      "name": "method",
+      "label": "方法",
+      "type": "select",
+      "options": [{"value":"NMDS","label":"NMDS"},{"value":"PCoA","label":"PCoA"}],
+      "default": "NMDS"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "matrix",
+      "label": "丰度矩阵",
+      "type": "matrix",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "beta_results",
+      "label": "Beta 多样性结果",
+      "type": "matrix"
+    },
+    {
+      "name": "beta_plot",
+      "label": "Beta 多样性排序图",
+      "type": "ggplot"
+    }
+  ]
+}

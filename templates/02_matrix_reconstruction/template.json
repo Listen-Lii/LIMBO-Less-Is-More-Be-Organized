@@ -1,0 +1,35 @@
+{
+  "name": "矩阵重构",
+  "description": "按分类学级别重构丰度矩阵",
+  "type": "reconstruct",
+  "params": [
+    {
+      "name": "level",
+      "label": "分类级别",
+      "type": "select",
+      "options": [{"value":"Phylum","label":"Phylum"},{"value":"Class","label":"Class"},{"value":"Order","label":"Order"},{"value":"Family","label":"Family"},{"value":"Genus","label":"Genus"},{"value":"Species","label":"Species"}],
+      "default": "Phylum"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "matrix",
+      "label": "丰度矩阵",
+      "type": "matrix",
+      "required": true
+    },
+    {
+      "name": "annotation",
+      "label": "注释文件",
+      "type": "matrix",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "reconstructed_matrix",
+      "label": "重构后矩阵",
+      "type": "matrix"
+    }
+  ]
+}

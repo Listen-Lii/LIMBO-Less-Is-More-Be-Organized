@@ -1,0 +1,29 @@
+{
+  "name": "抽平",
+  "description": "对OTU矩阵进行随机抽平，用于标准化样本测序深度",
+  "type": "rarefy",
+  "params": [
+    {
+      "name": "depth",
+      "label": "抽平深度",
+      "type": "select",
+      "options": [{"value":"min","label":"最小样本 reads"},{"value":"mean","label":"平均值"},{"value":"median","label":"中位数"}],
+      "default": "min"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "matrix",
+      "label": "丰度矩阵",
+      "type": "matrix",
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "rarefied_data",
+      "label": "抽平后矩阵",
+      "type": "matrix"
+    }
+  ]
+}

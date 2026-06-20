@@ -1,0 +1,40 @@
+{
+  "name": "Alpha 多样性",
+  "description": "计算 Shannon、Simpson、ACE、Chao1、Richness 等多样性指数，并生成箱线图",
+  "type": "alpha",
+  "params": [
+    {
+      "name": "test",
+      "label": "检验方法",
+      "type": "select",
+      "options": [{"value":"duncan","label":"Duncan"},{"value":"t.test","label":"t.test"},{"value":"kruskal","label":"Kruskal-Wallis"}],
+      "default": "duncan"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "matrix",
+      "label": "丰度矩阵",
+      "type": "matrix",
+      "required": true
+    },
+    {
+      "name": "group",
+      "label": "分组列",
+      "type": "vector",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "alpha_results",
+      "label": "Alpha 多样性结果",
+      "type": "matrix"
+    },
+    {
+      "name": "alpha_plot",
+      "label": "Alpha 多样性箱线图",
+      "type": "ggplot"
+    }
+  ]
+}
