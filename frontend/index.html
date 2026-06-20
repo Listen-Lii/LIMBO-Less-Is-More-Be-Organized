@@ -1,0 +1,3916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIMBO - 生物信息分析面板</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.4/dist/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+            --sidebar-bg: #1e293b;
+            --sidebar-text: #e2e8f0;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header with Tabs */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 { font-size: 1.2rem; font-weight: 600; }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .tab {
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .tab.active {
+            background: rgba(255,255,255,0.25);
+            font-weight: 500;
+        }
+
+        .header-status {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 0.8rem;
+            text-align: right;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-dot.connected { background: var(--success); }
+        .status-dot.warning { background: var(--warning); }
+        .status-dot.error { background: var(--error); }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Page - hidden by default */
+        .page {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 0 12px;
+            margin-bottom: 16px;
+        }
+
+        .sidebar-section h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            padding-left: 8px;
+        }
+
+        .sidebar-btn {
+            width: 100%;
+            padding: 12px 16px;
+            background: transparent;
+            border: none;
+            color: var(--sidebar-text);
+            text-align: left;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .sidebar-btn.active {
+            background: var(--primary);
+        }
+
+        .sidebar-btn .icon {
+            width: 32px;
+            min-width: 32px;
+            height: 24px;
+            text-align: center;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-right: 4px;
+        }
+
+        .env-indicator {
+            margin-top: auto;
+            padding: 16px 12px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .env-indicator .label {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .env-indicator .env-name {
+            font-size: 0.85rem;
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        /* Main Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        /* Workflow Panel */
+        .workflow-panel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-width: 0;
+        }
+
+        .workflow-panel h2 {
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Agent Dialog */
+        .agent-dialog {
+            flex: 0.6;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .dialog-container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .dialog-header {
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .dialog-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .message.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.agent {
+            background: #f1f5f9;
+            color: var(--text);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.system {
+            background: #fef3c7;
+            color: #92400e;
+            align-self: center;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+
+        /* Streaming message styles */
+        .message.agent.streaming {
+            position: relative;
+        }
+
+        .message.agent.streaming::after {
+            content: '▊';
+            animation: blink 1s infinite;
+            color: var(--primary);
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Thinking indicator animation - class .thinking on .system messages */
+        .message.system.thinking {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+        }
+
+        .message.system.thinking .dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .message.system.thinking .dot {
+            width: 6px;
+            height: 6px;
+            background: #92400e;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .message.system.thinking .dot:nth-child(1) { animation-delay: -0.32s; }
+        .message.system.thinking .dot:nth-child(2) { animation-delay: -0.16s; }
+        .message.system.thinking .dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .dialog-input {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .dialog-input input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .dialog-input input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Env Build Page */
+        .env-build-content {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        .env-build-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .env-build-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .env-build-preview {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .env-build-preview h2 {
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .env-build-agent {
+            flex: 0.6;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 300px;
+        }
+
+        .env-build-agent .dialog-container {
+            flex: 1;
+        }
+
+        .preview-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .preview-tab {
+            padding: 6px 12px;
+            background: #f1f5f9;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .preview-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .preview-content {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            min-height: 400px;
+            height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        .preview-content pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 0;
+        }
+
+        .preview-content pre code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            white-space: pre;
+        }
+
+        .markdown-body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+        }
+
+        .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .markdown-body h1 { font-size: 2em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }
+        .markdown-body h2 { font-size: 1.5em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.3em; }
+        .markdown-body h3 { font-size: 1.25em; }
+
+        .markdown-body table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }
+
+        .markdown-body th, .markdown-body td {
+            border: 1px solid #d1d5db;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .markdown-body th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .markdown-body code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-body pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        .markdown-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .ascii-diagram {
+            background: #1e293b;
+            color: #7dd3fc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin: 12px 0;
+        }
+
+        .config-step {
+            margin-bottom: 12px;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .step-config-body {
+            padding: 8px 0;
+        }
+
+        .workflow-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            padding: 4px;
+        }
+
+        .workflow-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: box-shadow 0.2s, transform 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .workflow-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .workflow-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid var(--border);
+            flex: 1;
+        }
+
+        .workflow-card-title {
+            display: flex;
+            align-items: stretch;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .workflow-number {
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        .workflow-desc {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin: 4px 0 0;
+        }
+
+        .workflow-card-footer {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #e2e8f0;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state .icon {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+            color: #94a3b8;
+        }
+
+        .empty-state h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 75%;
+            max-width: 700px;
+            max-height: 60vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Connection List */
+        .connection-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .connection-item {
+            padding: 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-item .info h4 {
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .connection-item .info p {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .connection-item .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .connection-item .status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .connection-item .status.connected {
+            background: var(--success);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--primary);
+            background: #f0f7ff;
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+
+        .drop-zone .icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: var(--text);
+            color: white;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 200;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+        .toast.warning { background: var(--warning); }
+
+        /* Terminal Output */
+        .terminal-output {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .terminal-output .error {
+            color: #f87171;
+        }
+
+        .terminal-output .success {
+            color: #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>LIMBO</h1>
+        <div class="tabs">
+            <button class="tab active" data-i18n="nav.environment_build" onclick="switchTab('envbuild')">环境构建</button>
+            <button class="tab" data-i18n="nav.workflow" onclick="switchTab('workflow')">工作流管理</button>
+            <button class="tab" data-i18n="tab.r_data" onclick="switchTab('rdata')">R 数据分析</button>
+        </div>
+        <div class="header-status">
+            <div class="status-item">
+                <div class="status-dot" id="serverStatus"></div>
+                <span id="serverStatusText" data-i18n="status.not_connected">未连接</span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="envStatus"></div>
+                <span id="envStatusText" data-i18n="status.no_env">未选择环境</span>
+            </div>
+            <div class="status-item" style="margin-top: 4px; gap: 8px;">
+                <select id="langSwitcher" onchange="switchLanguage(this.value)" style="background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 2px 6px; font-size: 0.8rem; cursor: pointer;">
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                </select>
+                <button id="settingsBtn" onclick="showSettingsModal()" data-i18n-title="settings.title" data-i18n-title="label.settings" data-i18n-title="label.settings" data-i18n-title="label.settings" title="设置" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 0.85rem;">⚙</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Page: Workflow Management -->
+        <div class="page" id="page-workflow">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3 data-i18n="settings.general">General Settings</h3>
+                    <button class="sidebar-btn" onclick="showServerSelectModal()">
+                        <span class="icon">&#x1F5A5;</span>
+                        <span data-i18n="sidebar.select_server">Select Server</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="showSSHModal()">
+                        <span class="icon">&#x1F50D;</span>
+                        <span data-i18n="ssh.management">SSH Management</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="showCondaModal()">
+                        <span class="icon">&#x1F7E2;</span>
+                        <span data-i18n="sidebar.conda_env">Conda Environment</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="sidebar.file_input">File Input</h3>
+                    <button class="sidebar-btn" onclick="showMetadataModal()">
+                        <span class="icon">&#x1F4C4;</span>
+                        <span>Metadata</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="showWorkflowModal()">
+                        <span class="icon">&#x1F517;</span>
+                        <span data-i18n="workflow.workflow_file">Workflow File</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="label.tools">Tools</h3>
+                    <button class="sidebar-btn" onclick="showTerminalModal()">
+                        <span class="icon">&#x1F5A5;</span>
+                        <span data-i18n="label.terminal">Terminal</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="showLogModal()">
+                        <span class="icon">&#x1F4CB;</span>
+                        <span data-i18n="workflow.run_log_short">Run Log</span>
+                    </button>
+                </div>
+
+                <div class="env-indicator">
+                    <div class="label" data-i18n="sidebar.working_dir">Working Directory</div>
+                    <div class="env-name" id="workingDirDisplay" data-i18n="sidebar.not_set">Not set</div>
+                    <div class="label" style="margin-top: 8px;" data-i18n="sidebar.current_env">Current Environment</div>
+                    <div class="env-name" id="currentEnv" data-i18n="status.not_selected">Not selected</div>
+                </div>
+            </aside>
+
+            <main class="main-area">
+                <div class="workflow-panel" style="flex: 1;">
+                    <h2>
+                        工作流列表
+                        <button class="btn btn-secondary btn-small" onclick="loadWorkflowTable()" data-i18n="action.refresh">↻ Refresh</button>
+                        <button class="btn btn-secondary btn-small" onclick="showWorkflowModal()" data-i18n="action.upload">Upload</button>
+                    </h2>
+                    <div id="workflowContent"></div>
+                </div>
+
+                <div class="agent-dialog" style="flex: 0.4;">
+                    <div class="dialog-container">
+                        <div class="dialog-header" data-i18n="chat.agent_chat">Agent Chat</div>
+                        <div class="dialog-messages" id="dialogMessages">
+                            <div class="message agent">
+                                您好！我是 LIMBO 助手。<br><br>
+                                请按以下步骤开始：<br>
+                                1. 点击侧边栏"选择服务器"连接服务器<br>
+                                2. 点击"Conda 环境"选择分析环境<br data-i18n="chat.step3">3. Upload a workflow file or enter a workflow description</div>
+                        </div>
+                        <div class="dialog-input">
+                            <input type="text" id="dialogInput" data-i18n-placeholder="chat.input_placeholder" data-i18n-placeholder="chat.input_placeholder" data-i18n-placeholder="chat.input_placeholder" placeholder="输入您的问题..." onkeypress="handleDialogKeypress(event)">
+                            <button class="btn btn-primary" onclick="sendDialogMessage()" data-i18n="action.send">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Page: Environment Building -->
+        <div class="page active" id="page-envbuild">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3 data-i18n="settings.general">General Settings</h3>
+                    <button class="sidebar-btn" onclick="showServerSelectModal()">
+                        <span class="icon">&#x1F5A5;</span>
+                        <span data-i18n="sidebar.select_server">Select Server</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="showSSHModal()">
+                        <span class="icon">&#x1F50D;</span>
+                        <span data-i18n="ssh.management">SSH Management</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="sidebar.working_dir">Working Directory</h3>
+                    <button class="sidebar-btn" onclick="selectWorkingDir()">
+                        <span class="icon">&#x1F4C1;</span>
+                        <span data-i18n="workflow.select_dir">选择目录</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="workflow.env_actions">Environment Actions</h3>
+                    <button class="sidebar-btn" onclick="submitEnvBuild()">
+                        <span class="icon">&#x2699;</span>
+                        <span data-i18n="workflow.generate_env_config">Generate Environment Configuration</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="createCondaEnvWithAgent()">
+                        <span class="icon">&#x1F7E2;</span>
+                        <span data-i18n="workflow.create_env">Create Environment</span>
+                    </button>
+                </div>
+
+                <div class="env-indicator">
+                    <div class="label" data-i18n="sidebar.working_dir">Working Directory</div>
+                    <div class="env-name" id="envBuildWorkingDirDisplay" data-i18n="sidebar.not_set">Not set</div>
+                </div>
+            </aside>
+
+            <main class="main-area">
+                <div class="env-build-left" style="flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                    <div class="workflow-panel">
+                        <h2 data-i18n="tab.workflow_input">Workflow Input</h2>
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+                                <input type="text" id="envBuildWorkingDir" readonly data-i18n-placeholder="workflow.set_work_dir_first" data-i18n-placeholder="workflow.set_work_dir_first" data-i18n-placeholder="workflow.set_work_dir_first" placeholder="请先设置工作目录..."
+                                       style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: #f1f5f9;">
+                                <button class="btn btn-secondary" onclick="selectWorkingDir()" data-i18n="action.select">Select</button>
+                            </div>
+                        </div>
+
+                        <h4 style="margin: 15px 0 10px;" data-i18n="workflow.method_upload">Method 1: Upload File</h4>
+                        <div class="drop-zone" id="envBuildDropZone"
+                             ondragover="handleEnvBuildDragOver(event)"
+                             ondragleave="handleEnvBuildDragLeave(event)"
+                             ondrop="handleEnvBuildDrop(event)"
+                             onclick="document.getElementById('envBuildFileInput').click()">
+                            <div class="icon">&#x1F4C1;</div>
+                            <p data-i18n="workflow.drop_files_here">Click or drag files here</p>
+                            <p style="font-size: 0.8rem; margin-top: 8px; color: var(--text-light);" data-i18n="workflow.supported_formats_long">Supports .sh, .md, .txt, .yaml, .yml formats</p>
+                        </div>
+                        <input type="file" id="envBuildFileInput" accept=".sh,.md,.txt,.yaml,.yml" style="display: none" onchange="handleEnvBuildFile(event)">
+
+                        <h4 style="margin: 20px 0 10px;" data-i18n="workflow.method_text">Method 2: Free Text Input</h4>
+                        <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 10px;" data-i18n="workflow.input_help">Enter any format of workflow description, AI will analyze and extract steps</p>
+                        <textarea id="envBuildTextInput" data-i18n-placeholder="workflow.input_example" data-i18n-placeholder="workflow.input_example" data-i18n-placeholder="workflow.input_example" placeholder="例如：对FASTQ文件进行质量控制，去接头，聚类，物种注释..."
+                                  style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; font-family: monospace;"></textarea>
+
+                        <div style="display: flex; gap: 8px; margin-top: 16px;">
+                            <button class="btn btn-primary" id="envBuildSubmitBtn" onclick="submitEnvBuild()" data-i18n="workflow.generate_env_config">Generate Environment Configuration</button>
+                        </div>
+
+                        <div id="envBuildProgress" style="display: none; margin-top: 16px;">
+                            <h4 style="margin: 15px 0 10px;" data-i18n="workflow.thinking">Thinking...</h4>
+                            <pre id="envBuildOutput" style="background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 200px; overflow-y: auto;"></pre>
+                        </div>
+                    </div>
+
+                    <div class="env-build-agent" style="flex: 1; min-height: 200px;">
+                        <div class="dialog-container" style="height: 100%;">
+                            <div class="dialog-header" data-i18n="chat.agent_chat">Agent Chat</div>
+                            <div class="dialog-messages" id="envBuildDialogMessages">
+                                <div class="message agent" data-i18n="chat.welcome_agent">Hello! I am the LIMBO Agent. I can read and write files in your working directory.</div>
+                            </div>
+                            <div class="dialog-input">
+                                <input type="text" id="envBuildDialogInput" data-i18n-placeholder="chat.input_placeholder" data-i18n-placeholder="chat.input_placeholder" data-i18n-placeholder="chat.input_placeholder" placeholder="输入您的问题..." onkeypress="handleEnvBuildDialogKeypress(event)">
+                                <button class="btn btn-primary" onclick="sendEnvBuildDialogMessage()" data-i18n="action.send">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="env-build-preview" style="flex: 1; min-width: 0;">
+                    <h2>
+                        <span data-i18n="workflow.result_preview_short">生成结果预览</span>
+                        <button class="btn btn-secondary btn-small" data-i18n="workflow.open_dir" onclick="openEnvBuildDir()">打开目录</button>
+                    </h2>
+                    <div class="preview-tabs">
+                        <button class="preview-tab active" onclick="switchPreviewTab('supplies')">supplies-list.md</button>
+                        <button class="preview-tab" onclick="switchPreviewTab('environment')">environment.yml</button>
+                        <button class="preview-tab" onclick="switchPreviewTab('install')">install.sh</button>
+                        <button class="preview-tab" onclick="switchPreviewTab('manual')">MANUAL.md</button>
+                    </div>
+                    <div id="previewSupplies" class="preview-content markdown-body"><div class="empty-state"><p data-i18n="workflow.result_placeholder">Generation results will appear here</p></div></div>
+                    <div id="previewEnvironment" class="preview-content"><pre><code></code></pre></div>
+                    <div id="previewInstall" class="preview-content"><pre><code></code></pre></div>
+                    <div id="previewManual" class="preview-content markdown-body"><div class="empty-state"><p data-i18n="env.manual_here">MANUAL will appear here</p></div></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Page: R Data Analysis -->
+        <div class="page" id="page-rdata">
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3 data-i18n="sidebar.working_dir">Working Directory</h3>
+                    <button class="sidebar-btn" onclick="selectRDataWorkingDir()">
+                        <span class="icon">&#x1F4C1;</span>
+                        <span data-i18n="workflow.select_dir">选择目录</span>
+                    </button>
+                    <div id="rdataWorkingDirDisplay" style="font-size: 0.75rem; color: var(--text-light); padding: 4px 8px; word-break: break-all;" data-i18n="sidebar.not_set">Not set</div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="workflow.import_file">Import File</h3>
+                    <button class="sidebar-btn" onclick="document.getElementById('rdataAbundanceInput').click()">
+                        <span class="icon">&#x1F4C4;</span>
+                        <span data-i18n="r.abundance_matrix">Abundance Matrix</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="document.getElementById('rdataAnnotationInput').click()">
+                        <span class="icon">&#x1F4C4;</span>
+                        <span data-i18n="r.taxonomy_file">Taxonomy File</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="document.getElementById('rdataMetadataInput').click()">
+                        <span class="icon">&#x1F4C4;</span>
+                        <span>Metadata</span>
+                    </button>
+                    <input type="file" id="rdataAbundanceInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleRDataFileUpload(this, 'abundance')">
+                    <input type="file" id="rdataAnnotationInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleRDataFileUpload(this, 'annotation')">
+                    <input type="file" id="rdataMetadataInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleRDataFileUpload(this, 'metadata')">
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="r.taxonomy_preprocess">Taxonomy Preprocessing</h3>
+                    <select id="rdataTaxonomySelect" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:4px;margin-bottom:6px;">
+                        <option value="" data-i18n="r.select_tax_col">Select taxonomy column...</option>
+                    </select>
+                    <textarea id="rdataTaxonomyPrompt" data-i18n-placeholder="r.prompt_example" data-i18n-placeholder="r.prompt_example" data-i18n-placeholder="r.prompt_example" placeholder="输入 prompt，如：按照分类学级别将注释分列" style="width:100%;min-height:60px;padding:6px;border:1px solid var(--border);border-radius:4px;font-size:0.8rem;"></textarea>
+                    <button class="sidebar-btn" onclick="processTaxonomyWithLLM()" style="margin-top:6px;">
+                        <span class="icon">&#x2699;</span>
+                        <span data-i18n="workflow.llm_processing">LLM Processing</span>
+                    </button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 data-i18n="r.session">R Session</h3>
+                    <button class="sidebar-btn" onclick="loadRDataSession()">
+                        <span class="icon">&#x1F4BE;</span>
+                        <span data-i18n="r.load_session">Load Session</span>
+                    </button>
+                    <button class="sidebar-btn" onclick="listRDataObjects()">
+                        <span class="icon">&#x1F4DA;</span>
+                        <span data-i18n="r.view_objects">View Objects</span>
+                    </button>
+                </div>
+
+                <div class="env-indicator">
+                    <div class="label" data-i18n="sidebar.current_project">Current Project</div>
+                    <div class="env-name" id="rdataProjectName">-</div>
+                    <div class="label" style="margin-top: 8px;" data-i18n="sidebar.working_dir">Working Directory</div>
+                    <div class="env-name" id="rdataWorkingDir" style="font-size: 0.7rem;">-</div>
+                </div>
+            </aside>
+
+            <main class="main-area">
+                <!-- 左侧：分析卡片 -->
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+                    <div class="workflow-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h2 data-i18n="sidebar.analysis_card">Analysis Card</h2>
+                        </div>
+                        <input type="file" id="rdataFileInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleRDataFileUpload(this)">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;" id="analysisCardsContainer">
+                            <!-- 分析卡片通过 JS 动态生成 -->
+                        </div>
+                    </div>
+
+                                    </div>
+
+                <!-- 右侧：R对象 + 预览 -->
+                <div style="flex: 0.4; display: flex; flex-direction: column; gap: 16px; min-width: 280px;">
+                    <!-- R 对象列表 -->
+                    <div class="workflow-panel" style="max-height: 200px; overflow-y: auto;">
+                        <h2 data-i18n="r.objects">R Objects</h2>
+                        <div id="rdataObjectsList" style="font-size:0.8rem;">
+                            <div style="color:var(--text-light);" data-i18n="r.no_objects">No objects</div>
+                        </div>
+                    </div>
+
+                    <!-- 预览面板 -->
+                    <div class="workflow-panel" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                        <h2 data-i18n="action.preview">Preview</h2>
+                        <div id="rdataPreviewContent" style="flex: 1; overflow-y: auto; font-size: 0.85rem;">
+                            <div style="color:var(--text-light);" data-i18n="r.select_object_to_preview">Select an object to preview</div>
+                        </div>
+                    </div>
+
+                    <!-- 执行日志 -->
+                    <div class="workflow-panel" style="max-height: 150px; overflow-y: auto;">
+                        <h2 data-i18n="workflow.run_log">Run Log</h2>
+                        <pre id="rdataLogOutput" style="background: #1e293b; color: #e2e8f0; padding: 8px; border-radius: 4px; font-size: 0.75rem; font-family: monospace; min-height: 50px;"></pre>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal: SSH Connection -->
+    <div class="modal-overlay" id="sshModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 data-i18n="ssh.connection_management">SSH Connection Management</h3>
+                <button class="modal-close" onclick="closeModal('sshModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <button class="btn btn-primary" onclick="showAddSSHForm()" style="margin-bottom: 15px;" data-i18n="ssh.add_connection">+ Add New Connection</button>
+
+                <div id="addSSHForm" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                    <label data-i18n="label.connection_name">Connection Name</label>
+                    <input type="text" id="sshName" placeholder="my-server">
+
+                    <label data-i18n="label.host">Host</label>
+                    <input type="text" id="sshHost" placeholder="192.168.1.100">
+
+                    <label data-i18n="label.port">Port</label>
+                    <input type="number" id="sshPort" value="22">
+
+                    <label data-i18n="label.username">Username</label>
+                    <input type="text" id="sshUser" placeholder="root">
+
+                    <label data-i18n="ssh.auth_method">Authentication Method</label>
+                    <select id="sshAuthType" onchange="toggleAuthMethod()">
+                        <option value="password" data-i18n="ssh.password_auth">Password</option>
+                        <option value="key" data-i18n="ssh.key_file">Key File</option>
+                    </select>
+
+                    <div id="passwordAuth">
+                        <label data-i18n="label.password">Password</label>
+                        <input type="password" id="sshPassword" data-i18n-placeholder="ssh.enter_password" data-i18n-placeholder="ssh.enter_password" data-i18n-placeholder="ssh.enter_password" placeholder="输入密码">
+                    </div>
+
+                    <div id="keyAuth" style="display: none;">
+                        <label data-i18n="ssh.key_path">Key File Path</label>
+                        <input type="text" id="sshKeyFile" placeholder="~/.ssh/id_rsa">
+                    </div>
+
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="hideAddSSHForm()" data-i18n="action.cancel">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveSSHConnection()" data-i18n="action.save">Save</button>
+                    </div>
+                </div>
+
+                <div id="sshConnectionsList" class="connection-list">
+                    <div class="empty-state">
+                        <p data-i18n="ssh.no_connections">No SSH connections</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Server Selection -->
+    <div class="modal-overlay" id="serverSelectModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 data-i18n="sidebar.select_server">Select Server</h3>
+                <button class="modal-close" onclick="closeModal('serverSelectModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="serverList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Conda Environment -->
+    <div class="modal-overlay" id="condaModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>选择 Conda 环境</h3>
+                <button class="modal-close" onclick="closeModal('condaModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="condaEnvsList">
+                    <div class="empty-state"><p data-i18n="common.loading_alt">Loading...</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Metadata Upload -->
+    <div class="modal-overlay" id="metadataModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 data-i18n="workflow.upload_metadata">Upload Metadata File</h3>
+                <button class="modal-close" onclick="closeModal('metadataModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="drop-zone" id="metaDropZone"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleMetaDrop(event)"
+                    onclick="document.getElementById('metaFileInput').click()">
+                    <div class="icon">&#x1F4C1;</div>
+                    <p data-i18n="workflow.drop_files_here">Click or drag files here</p>
+                    <p style="font-size: 0.8rem; margin-top: 8px;" data-i18n="workflow.supports_tsv_csv">Supports TSV, CSV formats</p>
+                </div>
+                <input type="file" id="metaFileInput" accept=".tsv,.csv" style="display: none" onchange="handleMetaFile(event)">
+                <div id="metadataPreview" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Workflow Upload -->
+    <div class="modal-overlay" id="workflowModal">
+        <div class="modal" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>上传流程文件 / 自由输入</h3>
+                <button class="modal-close" onclick="closeModal('workflowModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4 style="margin: 15px 0 10px;" data-i18n="workflow.method_upload">Method 1: Upload File</h4>
+                <div class="drop-zone" id="workflowDropZone"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleWorkflowDrop(event)"
+                    onclick="document.getElementById('workflowFileInput').click()">
+                    <div class="icon">&#x1F517;</div>
+                    <p data-i18n="workflow.drop_files_here">Click or drag files here</p>
+                    <p style="font-size: 0.8rem; margin-top: 8px;" data-i18n="workflow.supported_formats_yaml">Supports YAML, JSON, SH, MD formats</p>
+                </div>
+                <input type="file" id="workflowFileInput" accept=".yaml,.yml,.json,.sh,.md" style="display: none" onchange="handleWorkflowFile(event)">
+
+                <h4 style="margin: 20px 0 10px;" data-i18n="workflow.method_text">Method 2: Free Text Input</h4>
+                <textarea id="workflowTextInput" data-i18n-placeholder="workflow.input_placeholder" data-i18n-placeholder="workflow.input_placeholder" data-i18n-placeholder="workflow.input_placeholder" placeholder="输入工作流描述..." style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem;"></textarea>
+                <button class="btn btn-primary" style="margin-top: 10px;" onclick="submitWorkflowText()" data-i18n="sidebar.analysis_text">Analysis Text</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Workflow List -->
+    <div class="modal-overlay" id="workflowListModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 data-i18n="sidebar.select_workflow">Select Workflow</h3>
+                <button class="modal-close" onclick="closeModal('workflowListModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="workflowListContainer" data-i18n="common.loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Log Viewer -->
+    <div class="modal-overlay" id="logModal">
+        <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 data-i18n="workflow.run_log_short">Run Log</h3>
+                <button class="modal-close" onclick="closeModal('logModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logContent" style="background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; max-height: 500px; overflow-y: auto;">暂无日志</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Terminal -->
+    <div class="modal-overlay" id="terminalModal">
+        <div class="modal" style="max-width: 900px; height: 80vh;">
+            <div class="modal-header">
+                <h3 data-i18n="ssh.remote_terminal">Remote Terminal</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <span id="terminalStatus" style="font-size: 0.8rem; color: #64748b;" data-i18n="common.connecting">Connecting...</span>
+                    <button class="modal-close" onclick="closeModal('terminalModal')">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 12px; flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+                <div id="terminal-container" style="width: 100%; flex: 1; min-height: 0; background: #1e1e1e; border-radius: 6px; padding: 0; overflow: hidden;"></div>
+            </div>
+            <div class="modal-footer" style="padding: 6px 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: #64748b;" data-i18n="ssh.tab_hint">Tab to complete | Ctrl+C to exit</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary btn-small" onclick="clearTerminal()" data-i18n="action.clear">Clear</button>
+                    <button class="btn btn-secondary btn-small" onclick="closeModal('terminalModal')" data-i18n="action.close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Parameter Config -->
+    <div class="modal-overlay" id="paramModal">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 id="paramModalTitle" data-i18n="wfc.params_config">Parameter Configuration</h3>
+                <button class="modal-close" onclick="closeModal('paramModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div id="paramModalBody"></div>
+            </div>
+            <div class="modal-footer" id="paramModalFooter">
+                <button class="btn btn-secondary" id="modalBackBtn" style="display: none;" onclick="backToWorkflowStepsFromModal()" data-i18n="action.back">Back</button>
+                <button class="btn btn-primary" data-i18n="action.save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: R Script Config -->
+    <div class="modal-overlay" id="rScriptModal">
+        <div class="modal" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="rScriptModalTitle" data-i18n="workflow.script_config">Script Configuration</h3>
+                <button class="modal-close" onclick="closeModal('rScriptModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <input type="hidden" id="rScriptConfig" value="">
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 4px;" data-i18n="workflow.script_name">Script Name</label>
+                    <input type="text" id="rScriptName" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 4px;" data-i18n="label.description">Description</label>
+                    <input type="text" id="rScriptDescription" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;" readonly>
+                </div>
+                <div id="rScriptParamsContainer"></div>
+                <div id="rScriptInputsContainer" style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 4px;" data-i18n="r.input_data">Input Data</label>
+                    <select id="rScriptInput" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                        <option value="" data-i18n="r.please_select">Please select...</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 4px;" data-i18n="r.code">R Code</label>
+                    <textarea id="rScriptCode" style="width: 100%; min-height: 200px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="saveRScriptToProject()" data-i18n="workflow.save_to_project">Save to Project</button>
+                <button class="btn btn-primary" onclick="runRScriptFromModal()" data-i18n="action.run">Run</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Working Directory -->
+    <div class="modal-overlay" id="workingDirModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 data-i18n="workflow.select_work_dir">Select Working Directory</h3>
+                <button class="modal-close" onclick="closeModal('workingDirModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 15px;" data-i18n="workflow.working_dir_help">Used to store environment configuration files and workflow scripts</p>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="workingDirInput" placeholder="/Users/username/project-name"
+                           style="flex: 1; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem;">
+                    <button class="btn btn-secondary" onclick="openNativeFolderPicker()" data-i18n="action.select">Select</button>
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 16px;">
+                    <button class="btn btn-primary" onclick="confirmWorkingDir()" data-i18n="action.confirm">Confirm</button>
+                    <button class="btn btn-secondary" onclick="closeModal('workingDirModal')" data-i18n="action.cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header"><h3 data-i18n="settings.title">设置</h3><button class="modal-close" onclick="closeModal('settingsModal')">&times;</button></div>
+            <div class="modal-body">
+                <div style="margin-bottom: 16px;">
+                    <label data-i18n="settings.env_fix_attempts" style="display: block; font-weight: 500; margin-bottom: 6px;">环境自动修正最大尝试次数</label>
+                    <input type="number" id="settingEnvFixAttempts" min="1" max="10" value="3" style="width: 100px; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                    <small data-i18n="settings.env_fix_attempts_help" style="display: block; color: var(--text-light); margin-top: 4px;">AI 智能体在创建环境失败时最多重试的次数 (1-10)。</small>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-secondary" onclick="closeModal('settingsModal')" data-i18n="settings.cancel">取消</button>
+                <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings.save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script>
+        const API_BASE = 'http://localhost:5001/api';
+
+        // ============== Language / Settings ==============
+        async function switchLanguage(lang) {
+            await I18n.load(lang);
+            if (typeof refreshDynamicStrings === 'function') refreshDynamicStrings();
+        }
+
+        async function showSettingsModal() {
+            try {
+                const resp = await fetch(`${API_BASE}/settings`);
+                const data = await resp.json();
+                const s = (data && data.settings) || {};
+                const input = document.getElementById('settingEnvFixAttempts');
+                if (input) input.value = s.env_fix_max_attempts || 3;
+            } catch (e) {
+                showToast('加载设置失败: ' + e.message, 'error');
+            }
+            openModal('settingsModal');
+        }
+
+        async function saveSettings() {
+            const input = document.getElementById('settingEnvFixAttempts');
+            const v = parseInt(input.value, 10);
+            if (isNaN(v) || v < 1 || v > 10) {
+                showToast(I18n.t('settings.invalid_value', '无效值。必须在 1 到 10 之间。'), 'error');
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE}/settings`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ env_fix_max_attempts: v }),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast(I18n.t('settings.saved', '设置已保存'), 'success');
+                    closeModal('settingsModal');
+                } else {
+                    showToast((data.error || '保存失败'), 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        I18n.onChange((loc) => {
+            const sel = document.getElementById('langSwitcher');
+            if (sel && sel.value !== loc) sel.value = loc;
+            I18n.applyAll(document);
+        });
+
+        function refreshDynamicStrings() {}
+
+        const state = {
+            connections: {},
+            activeConnection: 'local',
+            activeEnv: null,
+            workingDir: null,
+            envBuildFiles: null
+        };
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Check conda env for envbuild, workflow, rdata tabs
+            if ((tabName === 'envbuild' || tabName === 'workflow' || tabName === 'rdata') && !state.activeEnv) {
+                showToast('请先选择 conda 环境', 'warning');
+                showCondaModal();
+                return;
+            }
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+            const tabBtn = document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`);
+            const page = document.getElementById(`page-${tabName}`);
+            if (tabBtn) tabBtn.classList.add('active');
+            if (page) page.classList.add('active');
+
+            // Load workflow table when switching to workflow tab
+            if (tabName === 'workflow') {
+                loadWorkflowTable();
+            }
+
+            // Load R data project cards when switching to rdata tab
+            if (tabName === 'rdata') {
+                refreshRDataTemplates();
+            }
+
+            // Sync dialog messages to both containers
+            syncDialogMessages();
+        }
+
+        // DOM element references for streaming (avoid full rebuild)
+        const messageElements = { dialog: [], envBuild: [] };
+        let streamingMsgIdx = null; // Track which message is currently streaming
+
+        let syncDialogMessages = (() => {
+            let timeout = null;
+            return () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    const containers = [
+                        { id: 'dialogMessages', key: 'dialog' },
+                        { id: 'envBuildDialogMessages', key: 'envBuild' }
+                    ];
+                    containers.forEach(({ id, key }) => {
+                        const container = document.getElementById(id);
+                        if (!container) return;
+
+                        // Only rebuild if element count mismatch
+                        const currentEls = messageElements[key] || [];
+                        if (currentEls.length !== sharedMessages.length) {
+                            container.innerHTML = '';
+                            messageElements[key] = [];
+                            sharedMessages.forEach((msg, idx) => {
+                                const div = document.createElement('div');
+                                div.className = `message ${msg.type}`;
+                                if (idx === streamingMsgIdx) div.classList.add('streaming');
+                                if (msg.type === 'system' && msg.text === '思考中...') {
+                                    div.className = 'message system thinking';
+                                    div.innerHTML = '<span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span> 思考中...';
+                                } else {
+                                    div.innerHTML = msg.text.replace(/\n/g, '<br>');
+                                }
+                                container.appendChild(div);
+                                messageElements[key][idx] = div;
+                            });
+                        } else {
+                            // Incremental update - only update text content
+                            sharedMessages.forEach((msg, idx) => {
+                                const el = currentEls[idx];
+                                if (!el) return;
+                                if (msg.type === 'system' && msg.text === '思考中...') {
+                                    if (!el.classList.contains('thinking')) {
+                                        el.className = 'message system thinking';
+                                        el.innerHTML = '<span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span> 思考中...';
+                                    }
+                                } else {
+                                    el.innerHTML = msg.text.replace(/\n/g, '<br>');
+                                }
+                                if (idx === streamingMsgIdx) el.classList.add('streaming');
+                                else el.classList.remove('streaming');
+                            });
+                        }
+                        container.scrollTop = container.scrollHeight;
+                    });
+                }, 10);
+            };
+        })();
+
+        // Shared message state
+        const sharedMessages = [
+            { type: 'agent', text: '您好！我是 Universal Panel 助手，请问今天有什么能够帮助您？' }
+        ];
+
+        function switchPreviewTab(tabName) {
+            document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.preview-content').forEach(c => c.style.display = 'none');
+
+            const tabBtn = document.querySelector(`.preview-tab[onclick="switchPreviewTab('${tabName}')"]`);
+            const content = document.getElementById(`preview${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+            if (tabBtn) tabBtn.classList.add('active');
+            if (content) content.style.display = 'block';
+        }
+
+        // API Helper
+        async function api(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: { 'Content-Type': 'application/json' },
+                    ...options
+                });
+                if (response.status === 204) return { success: true };
+                const text = await response.text();
+                try {
+                    const data = JSON.parse(text);
+                    if (!response.ok) {
+                        return { error: data.error || `HTTP ${response.status}` };
+                    }
+                    return data;
+                } catch {
+                    return { error: 'Invalid JSON: ' + text.substring(0, 100) };
+                }
+            } catch (error) {
+                return { error: '无法连接到后端服务: ' + error.message };
+            }
+        }
+
+        // Toast
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Modal
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // Working Directory
+        function selectWorkingDir() {
+            document.getElementById('workingDirInput').value = state.workingDir || '';
+            openModal('workingDirModal');
+        }
+
+        async function openNativeFolderPicker() {
+            try {
+                const result = await api('/dialog/select-folder');
+                if (result.success && result.path) {
+                    document.getElementById('workingDirInput').value = result.path;
+                }
+            } catch (e) {
+                showToast('选择失败', 'error');
+            }
+        }
+
+        function confirmWorkingDir() {
+            const path = document.getElementById('workingDirInput').value.trim();
+            if (!path) {
+                showToast('请输入或选择目录路径', 'warning');
+                return;
+            }
+            state.workingDir = path;
+            document.getElementById('workingDirDisplay').textContent = path;
+            document.getElementById('envBuildWorkingDir').value = path;
+            document.getElementById('envBuildWorkingDirDisplay').textContent = path;
+            closeModal('workingDirModal');
+            showToast('工作目录已设置', 'success');
+
+            // Check for existing env-build files
+            checkExistingEnvBuild(path);
+        }
+
+        async function checkExistingEnvBuild(workingDir) {
+            try {
+                const result = await api('/env-build/check-existing?working_dir=' + encodeURIComponent(workingDir));
+                if (result.exists && result.files && result.files.length > 0) {
+                    state.envBuildFiles = result.files;
+                    // Load existing files into preview
+                    for (const file of result.files) {
+                        const tabName = file.name === 'supplies-list.md' ? 'supplies'
+                            : file.name === 'environment.yml' ? 'environment'
+                            : file.name === 'install.sh' ? 'install'
+                            : file.name === 'MANUAL.md' ? 'manual' : null;
+                        if (tabName) {
+                            const elementId = 'preview' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+                            loadPreview(file.path, elementId);
+                        }
+                    }
+                    // Switch to first tab to show content
+                    switchPreviewTab('supplies');
+                    showToast('已加载先前创建的环境配置', 'info');
+                }
+            } catch (e) {
+                console.log('No existing env-build found');
+            }
+        }
+
+        // SSH
+        function showSSHModal() { openModal('sshModal'); loadSSHConnections(); }
+        function showServerSelectModal() { openModal('serverSelectModal'); loadServerList(); }
+
+        async function loadServerList() {
+            const result = await api('/ssh/connections');
+            const container = document.getElementById('serverList');
+            let html = `
+                <div class="connection-item" onclick="selectServer('local')" style="cursor: pointer;">
+                    <div class="info"><h4>本地 (local)</h4><p>本地计算机</p></div>
+                    <div class="actions">${state.activeConnection === 'local' ? '<span style="color: var(--success);">✓</span>' : ''}</div>
+                </div>
+            `;
+            if (result && typeof result === 'object') {
+                Object.keys(result).forEach(name => {
+                    const conn = result[name];
+                    const isActive = state.activeConnection === name;
+                    html += `
+                        <div class="connection-item" onclick="selectServer('${name}')" style="cursor: pointer;">
+                            <div class="info"><h4>${conn.name}</h4><p>${conn.user}@${conn.host}:${conn.port}</p></div>
+                            <div class="actions">${isActive ? '<span style="color: var(--success);">✓</span>' : ''}</div>
+                        </div>
+                    `;
+                });
+            }
+            container.innerHTML = html;
+        }
+
+        function selectServer(name) {
+            state.activeConnection = name;
+            updateServerStatus();
+            closeModal('serverSelectModal');
+            showToast('已选择服务器: ' + (name === 'local' ? '本地' : name), 'success');
+        }
+
+        function updateServerStatus() {
+            const statusDot = document.getElementById('serverStatus');
+            const statusText = document.getElementById('serverStatusText');
+            if (state.activeConnection === 'local') {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = '本地';
+            } else {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = state.activeConnection;
+            }
+        }
+
+        function showAddSSHForm() { document.getElementById('addSSHForm').style.display = 'block'; }
+        function hideAddSSHForm() { document.getElementById('addSSHForm').style.display = 'none'; }
+
+        function toggleAuthMethod() {
+            const authType = document.getElementById('sshAuthType').value;
+            document.getElementById('passwordAuth').style.display = authType === 'password' ? 'block' : 'none';
+            document.getElementById('keyAuth').style.display = authType === 'key' ? 'block' : 'none';
+        }
+
+        async function loadSSHConnections() {
+            const result = await api('/ssh/connections');
+            if (result.error) return;
+            state.connections = {};
+            Object.values(result).forEach(conn => {
+                state.connections[conn.name] = conn;
+            });
+            const list = document.getElementById('sshConnectionsList');
+            const connections = Object.values(result);
+            if (connections.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>暂无SSH连接</p></div>';
+                return;
+            }
+            list.innerHTML = connections.map(conn => `
+                <div class="connection-item">
+                    <div class="info">
+                        <h4>${conn.name}</h4>
+                        <p>${conn.user}@${conn.host}:${conn.port}</p>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-danger btn-small" onclick="deleteSSHConnection('${conn.name}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function saveSSHConnection() {
+            const name = document.getElementById('sshName').value.trim();
+            const host = document.getElementById('sshHost').value.trim();
+            const port = parseInt(document.getElementById('sshPort').value) || 22;
+            const user = document.getElementById('sshUser').value.trim();
+            const authType = document.getElementById('sshAuthType').value;
+            if (!name || !host || !user) { showToast('请填写完整信息', 'error'); return; }
+            const config = { name, host, port, user };
+            if (authType === 'password') config.password = document.getElementById('sshPassword').value;
+            else config.key_file = document.getElementById('sshKeyFile').value;
+            await api('/ssh/connections', { method: 'POST', body: JSON.stringify(config) });
+            showToast('连接已保存', 'success');
+            hideAddSSHForm();
+            loadSSHConnections();
+        }
+
+        async function deleteSSHConnection(name) {
+            await api(`/ssh/connections/${name}`, { method: 'DELETE' });
+            showToast('已删除', 'success');
+            loadSSHConnections();
+        }
+
+        // Conda
+        function showCondaModal() { openModal('condaModal'); loadCondaEnvs(); }
+
+        async function loadCondaEnvs() {
+            document.getElementById('condaEnvsList').innerHTML = '<div class="empty-state"><p>正在加载...</p></div>';
+            const result = await api('/local/conda/list');
+            const list = document.getElementById('condaEnvsList');
+            if (result.error) { list.innerHTML = `<div class="empty-state"><p>${result.error}</p></div>`; return; }
+            const envs = result.environments || [];
+            if (envs.length === 0) { list.innerHTML = '<div class="empty-state"><p>未找到环境</p></div>'; return; }
+            list.innerHTML = envs.map(env => `
+                <div class="connection-item" style="cursor: pointer;" onclick="selectCondaEnv('${env}', '${env}')">
+                    <div class="info"><h4>${env.split('/').pop()}</h4><p>${env}</p></div>
+                </div>
+            `).join('');
+        }
+
+        function selectCondaEnv(name, path) {
+            state.activeEnv = path;
+            document.getElementById('currentEnv').textContent = name;
+            document.getElementById('envStatus').className = 'status-dot connected';
+            document.getElementById('envStatusText').textContent = name;
+            closeModal('condaModal');
+            showToast('环境已切换: ' + name, 'success');
+        }
+
+        // Metadata Modal
+        function showMetadataModal() { openModal('metadataModal'); }
+
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+        function handleDragLeave(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); }
+
+        function handleMetaDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) parseMetadataFile(files[0].name, files[0]);
+        }
+
+        function handleMetaFile(e) {
+            const file = e.target.files[0];
+            if (file) parseMetadataFile(file.name, file);
+        }
+
+        function parseMetadataFile(name, content) {
+            showToast('已加载: ' + name, 'success');
+            closeModal('metadataModal');
+        }
+
+        // Workflow Modal
+        function showWorkflowModal() { openModal('workflowModal'); }
+
+        function handleWorkflowDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    parseWorkflowFile(file.name, ev.target.result);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function handleWorkflowFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseWorkflowFile(file.name, e.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseWorkflowFile(filename, content) {
+            // Store content for analysis, show in modal
+            document.getElementById('workflowTextInput').value = content;
+            document.getElementById('workflowFileInput').value = '';
+            openModal('workflowModal');
+        }
+
+        // Workflow List Modal
+        function showWorkflowListModal() {
+            openModal('workflowListModal');
+            loadWorkflowList();
+        }
+
+        async function loadWorkflowList() {
+            const container = document.getElementById('workflowListContainer');
+            try {
+                const res = await api('/workflow/list');
+                if (res.workflows && res.workflows.length > 0) {
+                    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                    for (const wf of res.workflows) {
+                        html += `<button class="sidebar-btn" onclick="selectWorkflow('${wf.name}')" style="text-align: left;">
+                            <span class="icon">&#x1F4C2;</span>
+                            <span>${wf.name}</span>
+                        </button>`;
+                    }
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary);">暂无工作流</p>';
+                }
+            } catch (e) {
+                container.innerHTML = '<p style="color: red;">加载失败: ' + e.message + '</p>';
+            }
+        }
+
+        let currentWorkflowName = null;
+
+        async function loadWorkflowTable() {
+            const content = document.getElementById('workflowContent');
+            content.innerHTML = '<div class="empty-state"><div class="icon">[*]</div><p>加载中...</p></div>';
+
+            try {
+                const result = await api('/workflow/list');
+
+                if (!result.success || result.workflows.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">[*]</div>
+                            <h3>暂无工作流</h3>
+                            <p>请上传 supplies-list.md 或 .sh 脚本文件</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                content.innerHTML = `
+                    <div class="workflow-list">
+                        ${result.workflows.map((w, i) => `
+                            <div class="workflow-card">
+                                <div class="workflow-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div class="workflow-card-title">
+                                        <span class="workflow-number">${i + 1}</span>
+                                        <div>
+                                            <strong id="workflowName_${w.name}">${w.name}</strong>
+                                            <p class="workflow-desc">${w.params?.steps?.length || 0} 个步骤</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="workflow-card-footer">
+                                    <button class="btn btn-primary btn-small" onclick="configureWorkflow('${w.name}')">配置</button>
+                                    <button class="btn btn-secondary btn-small" onclick="viewWorkflowFiles('${w.name}')">查看</button>
+                                    <button class="btn btn-warning btn-small" onclick="renameWorkflow('${w.name}')">重命名</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (e) {
+                console.error('[Workflow Table] Error:', e);
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">[XX]</div>
+                        <h3>加载失败</h3>
+                        <p>${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function renameWorkflow(oldName) {
+            const newName = prompt('请输入新的工作流名称:', oldName);
+            if (!newName || newName === oldName) return;
+
+            const result = await api('/workflow/rename', {
+                method: 'POST',
+                body: JSON.stringify({old_name: oldName, new_name: newName})
+            });
+
+            if (result.success) {
+                showToast('重命名成功', 'success');
+                loadWorkflowTable();
+            } else {
+                showToast('重命名失败: ' + (result.error || '未知错误'), 'error');
+            }
+        }
+
+        function viewWorkflowFiles(name) {
+            api('/workflow/list').then(result => {
+                const workflow = result.workflows.find(w => w.name === name);
+                if (!workflow) { showToast('未找到工作流', 'error'); return; }
+
+                document.getElementById('paramModalTitle').textContent = `工作流详情: ${name}`;
+                const steps = workflow.params?.steps || [];
+                document.getElementById('paramModalBody').innerHTML = `
+                    <div style="background:#1e293b;color:#e2e8f0;padding:16px;border-radius:8px;font-family:monospace;font-size:0.85rem;">
+                        <p><strong>路径:</strong> ${workflow.path}</p>
+                        <p><strong>步骤数:</strong> ${steps.length}</p>
+                        ${steps.map(s => {
+                            const statusIcon = s.query_status === 'failed' ? '&#x274C;' : '&#x2705;';
+                            const statusTitle = s.query_status === 'failed' ? '参数查询失败' : '参数已查询';
+                            return `<div style="margin-top:12px;padding:8px;background:#334155;border-radius:4px;">
+                                <p><strong>${s.name}</strong> (${s.software || ''}) <span title="${statusTitle}">${statusIcon}</span></p>
+                                <p style="font-size:0.8rem;color:#94a3b8;">参数: ${(s.params || []).map(p => p.name).join(', ') || '无'}</p>
+                                ${s.query_status === 'failed' ? '<p style="color:#f59e0b;font-size:0.75rem;">&#x26A0; 参数查询失败，该工具可能未安装</p>' : ''}
+                            </div>`;
+                        }).join('') || ''}
+                    </div>
+                `;
+                document.getElementById('paramModalFooter').innerHTML = '<button class="btn btn-secondary" onclick="closeModal(\'paramModal\')">关闭</button>';
+                openModal('paramModal');
+            });
+        }
+
+        async function refreshWorkflowSteps() {
+            loadWorkflowTable();
+        }
+
+        function submitWorkflowText() {
+            if (!state.activeEnv) {
+                showToast('请先选择 conda 环境', 'warning');
+                showCondaModal();
+                return;
+            }
+            const text = document.getElementById('workflowTextInput').value.trim();
+            if (!text) { showToast('请输入工作流描述', 'warning'); return; }
+            closeModal('workflowModal');
+            openAnalysisProgress();
+            updateAnalysisProgress({
+                status: '正在分析工作流...',
+                statusType: 'active',
+                steps: [{ name: '工作流分析', software: '', status: 'active' }]
+            });
+
+            addDialogMessage('system', '正在调用 AI 分析工作流...');
+
+            api('/agent/generate-workflow', {
+                method: 'POST',
+                body: JSON.stringify({
+                    content: text,
+                    filename: 'workflow-text',
+                    env: state.activeEnv,
+                    working_dir: state.workingDir || ''
+                })
+            }).then(result => {
+                if (result.success) {
+                    updateAnalysisProgress({
+                        status: '工作流生成完成',
+                        statusType: 'done',
+                        steps: [{ name: '工作流分析', software: '', status: 'done' }]
+                    });
+                    addDialogMessage('agent', '工作流生成完成！请查看右侧预览面板。');
+                    closeAnalysisProgress();
+                } else {
+                    updateAnalysisProgress({
+                        status: '生成失败: ' + (result.error || '未知错误'),
+                        statusType: 'error',
+                        steps: [{ name: '工作流分析', software: '', status: 'error' }]
+                    });
+                    addDialogMessage('agent', '工作流生成失败: ' + (result.error || '未知错误'));
+                }
+            }).catch(err => {
+                updateAnalysisProgress({
+                    status: '请求失败: ' + err.message,
+                    statusType: 'error',
+                    steps: [{ name: '工作流分析', software: '', status: 'error' }]
+                });
+                addDialogMessage('agent', '请求失败: ' + err.message);
+            });
+        }
+
+        // =====================================================================
+        // Analysis Progress Window (LLM analysis process display)
+        // ================================================================= ====
+        let analysisProgressWindow = null;
+
+        function closeAnalysisProgressWindow() {
+            if (analysisProgressWindow && !analysisProgressWindow.closed) {
+                analysisProgressWindow.close();
+            }
+            analysisProgressWindow = null;
+        }
+
+        function openAnalysisProgress() {
+            closeAnalysisProgressWindow();
+            analysisProgressWindow = window.open('./llm-progress.html', 'AnalysisProgress', 'width=700,height=500,scrollbars=yes');
+        }
+
+        function updateAnalysisProgress(data) {
+            if (!analysisProgressWindow || analysisProgressWindow.closed) return;
+            try {
+                // Wait for child functions to be available (page may not be fully loaded yet)
+                var waitForChild = function(attempts) {
+                    if (typeof analysisProgressWindow.updateStatus !== 'function') {
+                        if (attempts > 0) {
+                            setTimeout(function() { waitForChild(attempts - 1); }, 50);
+                        }
+                        return;
+                    }
+                    if (data.status) analysisProgressWindow.updateStatus(data.status, data.statusType || "active");
+                    if (data.steps) analysisProgressWindow.updateSteps(data.steps);
+                    if (data.prompt) analysisProgressWindow.showPrompt(data.prompt);
+                    if (data.response) analysisProgressWindow.showResponse(data.response);
+                    if (data.result) analysisProgressWindow.showResult(data.result);
+                };
+                waitForChild(20);
+            } catch (e) { console.warn("Progress update error:", e); }
+        }
+
+        function closeAnalysisProgress() {
+            setTimeout(() => {
+                if (analysisProgressWindow && !analysisProgressWindow.closed) {
+                    analysisProgressWindow.close();
+                }
+                analysisProgressWindow = null;
+            }, 2000);
+        }
+
+        // Log Modal
+        function showLogModal() { openModal('logModal'); }
+
+        // Terminal Modal
+        // PTY Terminal state
+        let terminal = null;
+        let socket = null;
+        let currentSession = null;
+
+        function showTerminalModal() {
+            if (!state.activeEnv) {
+                showToast('请先选择 conda 环境', 'warning');
+                showCondaModal();
+                return;
+            }
+            openModal('terminalModal');
+            autoConnectTerminal();
+        }
+
+        function autoConnectTerminal() {
+            const server = state.activeConnection || 'local';
+            const env = state.activeEnv;
+            if (!env) {
+                showToast('请先选择 conda 环境', 'warning');
+                return;
+            }
+
+            // Initialize xterm
+            if (terminal) {
+                terminal.dispose();
+            }
+            terminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                theme: { background: '#1e1e1e', foreground: '#ffffff' },
+                scrollback: 1000,
+                macOptionIsMeta: true,
+                allowTransparency: false
+            });
+
+            // Add FitAddon for auto-resize
+            const fitAddon = new FitAddon.FitAddon();
+            terminal.loadAddon(fitAddon);
+            terminal.open(document.getElementById('terminal-container'));
+            fitAddon.fit();
+
+            // Disable local echo - let the server handle all echo
+            terminal.onData((data) => {
+                if (currentSession) {
+                    socket.emit('terminal_input', { session_id: currentSession, data });
+                }
+            });
+
+            // Connect WebSocket
+            socket = io('http://localhost:5001');
+            socket.on('connect', () => {
+                socket.emit('terminal_connect', { connection: server, env: env });
+            });
+
+            socket.on('terminal_session', (data) => {
+                currentSession = data.session_id;
+                document.getElementById('terminalStatus').textContent = '已连接';
+                document.getElementById('terminalStatus').style.color = '#10b981';
+                setTimeout(() => {
+                    fitAddon.fit();
+                    const dims = { cols: terminal.cols, rows: terminal.rows };
+                    socket.emit('terminal_resize', { session_id: currentSession, ...dims });
+                }, 200);
+            });
+            socket.on('terminal_output', (data) => {
+                terminal.write(data.output);
+            });
+            socket.on('terminal_error', (data) => {
+                document.getElementById('terminalStatus').textContent = '错误: ' + data.error;
+                document.getElementById('terminalStatus').style.color = '#ef4444';
+                terminal.write('\r\n\x1b[31mError: ' + data.error + '\x1b[0m\r\n');
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+                if (currentSession) {
+                    const dims = { cols: terminal.cols, rows: terminal.rows };
+                    socket.emit('terminal_resize', { session_id: currentSession, ...dims });
+                }
+            });
+
+            // Handle terminal resize
+            terminal.onResize(({ cols, rows }) => {
+                if (currentSession) {
+                    socket.emit('terminal_resize', { session_id: currentSession, cols, rows });
+                }
+            });
+
+            // Poll for output
+            setInterval(() => {
+                if (currentSession) {
+                    fetch(`/api/terminal/output/${currentSession}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.output) {
+                                terminal.write(data.output);
+                            }
+                        })
+                        .catch(() => {});
+                }
+            }, 50);
+        }
+
+        function clearTerminal() {
+            if (terminal) {
+                terminal.clear();
+            }
+        }
+
+        function closeTerminalModal() {
+            if (currentSession) {
+                socket.emit('terminal_disconnect', { session_id: currentSession });
+            }
+            if (terminal) {
+                terminal.dispose();
+                terminal = null;
+            }
+            currentSession = null;
+            closeModal('terminalModal');
+        }
+
+        // Env Build
+        function handleEnvBuildDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+        function handleEnvBuildDragLeave(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); }
+
+        function handleEnvBuildDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleEnvBuildFileContent(files[0]);
+        }
+
+        function handleEnvBuildFile(e) {
+            const file = e.target.files[0];
+            if (file) handleEnvBuildFileContent(file);
+        }
+
+        function handleEnvBuildFileContent(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('envBuildTextInput').value = e.target.result;
+                document.getElementById('envBuildDropZone').innerHTML = '<div class="icon">&#x1F4C4;</div><p>已加载: ' + file.name + '</p>';
+            };
+            reader.readAsText(file);
+        }
+
+        async function submitEnvBuild() {
+            const workingDir = state.workingDir || document.getElementById('envBuildWorkingDir').value;
+            const workflowText = document.getElementById('envBuildTextInput').value.trim();
+
+            if (!workingDir) {
+                showToast('请先选择工作目录', 'warning');
+                selectWorkingDir();
+                return;
+            }
+
+            if (!workflowText) {
+                showToast('请上传文件或输入工作流内容', 'warning');
+                return;
+            }
+
+            document.getElementById('envBuildProgress').style.display = 'block';
+            const outputEl = document.getElementById('envBuildOutput');
+            outputEl.textContent = '';
+            const submitBtn = document.getElementById('envBuildSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '处理中...';
+
+            // Open analysis progress window
+            openAnalysisProgress();
+            updateAnalysisProgress({
+                status: '正在分析工作流生成环境配置...',
+                statusType: 'active',
+                steps: [{ name: '分析工作流', software: '', status: 'active' }]
+            });
+
+            try {
+                const result = await api('/env-build/process', {
+                    method: 'POST',
+                    body: JSON.stringify({ workflow_text: workflowText, working_dir: workingDir })
+                });
+
+                if (result.success) {
+                    outputEl.textContent = result.output;
+                    state.envBuildFiles = result.files;
+                    showEnvBuildResults(result.files);
+                    showToast('环境配置生成成功', 'success');
+                    updateAnalysisProgress({
+                        status: '环境配置生成完成',
+                        statusType: 'done',
+                        steps: [{ name: '分析工作流', software: '', status: 'done' }],
+                        result: result.output
+                    });
+                    closeAnalysisProgress();
+                } else {
+                    outputEl.textContent = result.error || '生成失败';
+                    showToast(result.error || '生成失败', 'error');
+                    updateAnalysisProgress({
+                        status: '生成失败: ' + (result.error || '未知错误'),
+                        statusType: 'error',
+                        steps: [{ name: '分析工作流', software: '', status: 'error' }]
+                    });
+                }
+            } catch (error) {
+                outputEl.textContent = '\n\n[错误] ' + error.message;
+                showToast('处理失败', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '生成环境配置';
+            }
+        }
+
+        // Store params data globally for configureStepParams
+        window.currentWorkflowParams = null;
+
+        async function runWorkflowStep(workflowName, stepIndex) {
+            if (!state.activeEnv) {
+                showToast('请先选择 conda 环境', 'warning');
+                showCondaModal();
+                return;
+            }
+
+            showToast(`正在执行步骤 ${stepIndex + 1}...`, 'info');
+
+            try {
+                const result = await api(`/workflow/run-step/${workflowName}/${stepIndex}`, {
+                    method: 'POST'
+                });
+
+                if (result.success) {
+                    showToast(`步骤 ${stepIndex + 1} 执行完成`, 'success');
+                    addDialogMessage('system', `步骤 ${stepIndex + 1} 执行结果:\n${result.output || '(无输出)'}`);
+                    if (result.error) {
+                        addDialogMessage('system', `错误:\n${result.error}`);
+                    }
+                } else {
+                    showToast('执行失败: ' + (result.error || '未知错误'), 'error');
+                    addDialogMessage('system', `步骤 ${stepIndex + 1} 执行失败:\n${result.error || '未知错误'}`);
+                }
+            } catch (e) {
+                showToast('执行失败: ' + e.message, 'error');
+            }
+        }
+
+        function configureStepParams(workflowName, stepIndex) {
+            const paramsData = window.currentWorkflowParams;
+            if (!paramsData || !paramsData.steps) {
+                showToast('参数数据未加载', 'error');
+                return;
+            }
+            const step = paramsData.steps[stepIndex];
+            const stepNum = step.step || (stepIndex + 1);
+            let html = '<div class="step-config-body">';
+            if (step.query_status === 'failed') {
+                html += '<p style="color: #f59e0b;">&#x26A0; 无法获取参数信息</p>';
+            } else {
+                const requiredParams = step.params.filter(function(p) { return p.required; });
+                const optionalParams = step.params.filter(function(p) { return !p.required; });
+
+                if (requiredParams.length > 0) {
+                    html += '<div style="margin-bottom: 16px;"><strong style="color: #ef4444;">必填参数</strong></div>';
+                    for (const p of requiredParams) {
+                        const pWithDefault = Object.assign({}, p);
+                        if (pWithDefault.source === 'workflow' && !pWithDefault.default) {
+                            pWithDefault.default = generateDefaultFilename(workflowName, stepNum, pWithDefault);
+                        }
+                        html += '<div style="margin-bottom: 12px; padding: 10px; background: #fef2f2; border-radius: 6px; border-left: 3px solid #ef4444;">';
+                        html += '<label style="display: block; margin-bottom: 6px; font-weight: 500;">' + (pWithDefault.label || pWithDefault.name) + ' <span style="color: #ef4444;">*</span>' + getFileSourceBadge(pWithDefault) + ' <span style="font-weight: normal; color: #64748b; font-size: 0.8rem;">(' + pWithDefault.type + ')</span></label>';
+                        html += renderParamInput(pWithDefault);
+                        if (pWithDefault.description) {
+                            html += '<small style="color: #64748b; display: block; margin-top: 4px;">' + pWithDefault.description + '</small>';
+                        }
+                        html += '</div>';
+                    }
+                }
+
+                if (optionalParams.length > 0) {
+                    html += '<div style="margin-bottom: 8px;"><strong style="color: #64748b;">可选参数</strong> <button onclick="toggleOptionalParams(this)" style="background: none; border: none; color: #2563eb; cursor: pointer; font-size: 0.8rem;">展开</button></div>';
+                    html += '<div id="optionalParamsContainer" style="display: none;">';
+                    for (const p of optionalParams) {
+                        const pWithDefault = Object.assign({}, p);
+                        if (pWithDefault.source === 'workflow' && !pWithDefault.default) {
+                            pWithDefault.default = generateDefaultFilename(workflowName, stepNum, pWithDefault);
+                        }
+                        html += '<div style="margin-bottom: 12px; padding: 10px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #e2e8f0;">';
+                        html += '<label style="display: block; margin-bottom: 6px; font-weight: 500;">' + (pWithDefault.label || pWithDefault.name) + getFileSourceBadge(pWithDefault) + ' <span style="font-weight: normal; color: #64748b; font-size: 0.8rem;">(' + pWithDefault.type + ')</span></label>';
+                        html += renderParamInput(pWithDefault);
+                        if (pWithDefault.description) {
+                            html += '<small style="color: #64748b; display: block; margin-top: 4px;">' + pWithDefault.description + '</small>';
+                        }
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+            }
+            html += '</div>';
+            document.getElementById('paramModalTitle').textContent = '配置: ' + step.name + ' (' + step.software + ')';
+            const backBtn = document.getElementById('modalBackBtn');
+            if (backBtn) {
+                backBtn.style.display = 'inline-block';
+                backBtn.setAttribute('data-workflow', workflowName);
+            }
+            document.getElementById('paramModalBody').innerHTML = html;
+            document.getElementById('paramModalFooter').innerHTML = '<button class="btn btn-primary" onclick="saveStepConfigNoClose(\'' + workflowName + '\',' + stepIndex + ')">保存配置</button>';
+            openModal('paramModal');
+        }
+
+        function getFileSourceBadge(p) {
+            if (p.source === 'user') {
+                return ' <span style="background: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">外部文件</span>';
+            } else if (p.source === 'workflow') {
+                return ' <span style="background: #d1fae5; color: #065f46; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem;">内部文件</span>';
+            }
+            return '';
+        }
+
+        function generateDefaultFilename(workflowName, stepNum, param) {
+            let name = param.name.replace(/^--/, '');
+            let ext = 'txt';
+            if (name.includes('fastqout') || name.includes('fastq')) ext = 'fastq';
+            else if (name.includes('fastaout') || name.includes('fasta')) ext = 'fasta';
+            else if (name.includes('otutab')) ext = 'txt';
+            const stepStr = String(stepNum).replace('.', '_');
+            return workflowName + '/' + stepStr + '_' + name + '.' + ext;
+        }
+
+        function renderParamInput(p) {
+            let html = '';
+            if (p.type === 'boolean') {
+                html += '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">';
+                html += '<input type="checkbox" name="' + p.name + '" ' + (p.default ? 'checked' : '') + '>';
+                html += '<span>' + (p.default ? '是' : '否') + '</span>';
+                html += '</label>';
+            } else if (p.type === 'flag') {
+                const options = p.options || ['是', '否'];
+                html += '<select name="' + p.name + '" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;">';
+                for (const opt of options) {
+                    html += '<option value="' + opt + '">' + opt + '</option>';
+                }
+                html += '</select>';
+            } else if (p.type === 'numeric') {
+                html += '<input type="number" name="' + p.name + '" value="' + (p.default || '0') + '" placeholder="' + (p.default || '0') + '" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;">';
+            } else if (p.type === 'select' && p.options) {
+                html += '<select name="' + p.name + '" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;">';
+                for (const opt of p.options) {
+                    html += '<option value="' + opt + '"' + (p.default === opt ? ' selected' : '') + '>' + opt + '</option>';
+                }
+                html += '</select>';
+            } else {
+                html += '<input type="text" name="' + p.name + '" value="' + (p.default || '') + '" placeholder="' + (p.default || '') + '" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;">';
+            }
+            return html;
+        }
+
+        function toggleOptionalParams(btn) {
+            const container = document.getElementById('optionalParamsContainer');
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                btn.textContent = '收起';
+            } else {
+                container.style.display = 'none';
+                btn.textContent = '展开';
+            }
+        }
+
+        function saveStepConfigNoClose(workflowName, stepIndex) {
+            const body = document.getElementById('paramModalBody');
+            const inputs = body.querySelectorAll('input');
+            const selects = body.querySelectorAll('select');
+            const config = {};
+            for (const input of inputs) {
+                config[input.name] = input.type === 'checkbox' ? input.checked : input.value;
+            }
+            for (const select of selects) {
+                config[select.name] = select.value;
+            }
+            config['_env_path'] = state.activeEnv || '/opt/anaconda3';
+
+            fetch(`${API_BASE}/workflow/save-config/${workflowName}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.success) { showToast('配置已保存', 'success'); }
+                    else { showToast('保存失败', 'error'); }
+                });
+        }
+
+        function backToWorkflowStepsFromModal() {
+            const btn = document.getElementById('modalBackBtn');
+            const workflowName = btn ? btn.getAttribute('data-workflow') : null;
+            if (btn) btn.style.display = 'none';
+            closeModal('paramModal');
+            if (workflowName) configureWorkflow(workflowName);
+        }
+
+        function backToWorkflowSteps(workflowName) {
+            closeModal('paramModal');
+            configureWorkflow(workflowName);
+        }
+
+        async function configureWorkflow(name) {
+            if (!state.activeEnv) {
+                showToast('请先选择 conda 环境', 'warning');
+                showCondaModal();
+                return;
+            }
+            const result = await api('/workflow/render-config/' + name);
+            if (result.success) {
+                document.getElementById('paramModalTitle').textContent = `工作流配置: ${name}`;
+                const backBtn = document.getElementById('modalBackBtn');
+                if (backBtn) backBtn.style.display = 'none';
+                document.getElementById('paramModalBody').innerHTML = result.html;
+                document.getElementById('paramModalFooter').innerHTML = `
+                    <button class="btn btn-primary" onclick="saveWorkflowConfig('${name}')">保存配置</button>
+                `;
+                window.currentWorkflowParams = result.params;
+                openModal('paramModal');
+            } else {
+                showToast('无法加载配置: ' + result.error, 'error');
+            }
+        }
+
+        async function saveWorkflowConfig(name) {
+            const form = document.getElementById('workflow-config-form');
+            const formData = new FormData(form);
+            const config = {};
+            formData.forEach((value, key) => {
+                config[key] = value;
+            });
+
+            config['_env_path'] = state.activeEnv || '/opt/anaconda3';
+            if (state.workingDir) {
+                config['_working_dir'] = state.workingDir;
+            }
+
+            try {
+                const result = await api('/workflow/save-config/' + name, {
+                    method: 'POST',
+                    body: JSON.stringify(config)
+                });
+                if (result.success) {
+                    showToast('配置已保存', 'success');
+                    closeModal('paramModal');
+                } else {
+                    showToast('保存失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        function showEnvBuildResults(files) {
+            if (!files || files.length === 0) return;
+            state.envBuildFiles = files;
+            switchPreviewTab('supplies');
+        }
+
+        async function createCondaEnv() {
+            const workingDir = state.workingDir || document.getElementById('envBuildWorkingDir').value;
+            if (!workingDir) { showToast('请先设置工作目录', 'warning'); return; }
+
+            const ymlPath = workingDir + '/env-build/environment.yml';
+            let ymlContent = '';
+
+            try {
+                const fileResult = await api(`/env-build/read-file?path=${encodeURIComponent(ymlPath)}`);
+                if (fileResult.success) {
+                    ymlContent = fileResult.content;
+                }
+            } catch (e) {
+                showToast('无法读取 environment.yml', 'error');
+                return;
+            }
+
+            showToast('正在创建Conda环境...', 'info');
+
+            const result = await api('/env-build/create-env', {
+                method: 'POST',
+                body: JSON.stringify({ working_dir: workingDir })
+            });
+
+            if (result.success) {
+                showToast('Conda环境创建成功', 'success');
+                return;
+            }
+
+            const errorMsg = result.error || '未知错误';
+            const outputMsg = result.output || '';
+
+            const diagnosticMsg = `【环境创建失败】
+工作目录: ${workingDir}
+
+environment.yml 内容:
+${ymlContent}
+
+错误信息:
+${errorMsg}
+${outputMsg}
+
+请分析上述环境配置和错误信息，提出修复方案。你可以：
+1. 直接给出修改后的 environment.yml 内容（用 \`\`\`yaml 代码块包裹）
+2. 告诉我需要修改哪些部分
+3. 或者我可以调用"执行修复"来自动应用你的修改`;
+
+            sharedMessages.push({ type: 'user', text: diagnosticMsg });
+            syncDialogMessages();
+
+            sharedMessages.push({ type: 'system', text: '正在分析错误...' });
+            syncDialogMessages();
+
+            const agentMsgIndex = sharedMessages.length;
+            sharedMessages.push({ type: 'agent', text: '' });
+            syncDialogMessages();
+
+            sendAgentRequest(
+                `请分析以下 conda 环境创建失败的问题，并给出修复方案。
+
+工作目录: ${workingDir}
+
+environment.yml 内容:
+${ymlContent}
+
+错误信息:
+${errorMsg}
+${outputMsg}`,
+                workingDir,
+                (token) => {
+                    sharedMessages[agentMsgIndex].text += token;
+                    syncDialogMessages();
+                },
+                () => {
+                    if (sharedMessages.length > 0 && sharedMessages[agentMsgIndex-1]?.text === '正在分析错误...') {
+                        sharedMessages.splice(agentMsgIndex-1, 1);
+                    }
+                    syncDialogMessages();
+                }
+            );
+        }
+        async function sendAgentRequest(message, workingDir, onToken, onDone) {
+            const response = await fetch(`${API_BASE}/agent/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message,
+                    working_dir: workingDir || ''
+                })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            function read() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        if (onDone) onDone();
+                        return;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process all complete JSON objects in buffer
+                    let startIdx = 0;
+                    while (true) {
+                        const dataIdx = buffer.indexOf('data: ', startIdx);
+                        if (dataIdx === -1) break;
+
+                        const jsonStart = dataIdx + 6;
+                        let braceCount = 0;
+                        let jsonEnd = -1;
+
+                        for (let i = jsonStart; i < buffer.length; i++) {
+                            if (buffer[i] === '{') {
+                                braceCount++;
+                            } else if (buffer[i] === '}') {
+                                braceCount--;
+                                if (braceCount === 0) {
+                                    jsonEnd = i;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (jsonEnd !== -1) {
+                            const jsonStr = buffer.slice(jsonStart, jsonEnd + 1);
+                            try {
+                                const data = JSON.parse(jsonStr);
+                                if (data.token && onToken) onToken(data.token);
+                                else if (data.error && onToken) onToken('[错误] ' + data.error);
+                            } catch (e) {}
+                            startIdx = jsonEnd + 1;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (startIdx > 0) {
+                        buffer = buffer.slice(startIdx);
+                    }
+
+                    read();
+                });
+            }
+            read();
+        }
+
+        async function createCondaEnvWithAgent() {
+            const workingDir = state.workingDir || document.getElementById('envBuildWorkingDir').value;
+            if (!workingDir) { showToast('请先设置工作目录', 'warning'); return; }
+            const logsEl = document.getElementById('envBuildOutput');
+            if (logsEl) logsEl.textContent = '';
+            showToast('正在创建 Conda 环境（自动修复中，最多 3 次重试）...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/env-build/create-env-with-fix`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ working_dir: workingDir })
+                });
+                if (!response.body) throw new Error('No response body');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    let startIdx = 0;
+                    while (true) {
+                        const dataIdx = buffer.indexOf('data: ', startIdx);
+                        if (dataIdx === -1) break;
+                        const jsonStart = dataIdx + 6;
+                        let braceCount = 0, jsonEnd = -1;
+                        for (let i = jsonStart; i < buffer.length; i++) {
+                            if (buffer[i] === '{') braceCount++;
+                            else if (buffer[i] === '}') { braceCount--; if (braceCount === 0) { jsonEnd = i; break; } }
+                        }
+                        if (jsonEnd === -1) break;
+                        const jsonStr = buffer.slice(jsonStart, jsonEnd + 1);
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            if (data.type === 'log') {
+                                if (logsEl) logsEl.textContent += data.text + '\n';
+                                console.log('[env-build]', data.text);
+                            } else if (data.type === 'done') {
+                                if (data.success) {
+                                    showToast('✅ ' + (data.message || 'Conda 环境创建成功'), 'success');
+                                } else {
+                                    showToast('❌ ' + (data.error || '环境创建失败'), 'error');
+                                }
+                            }
+                        } catch (e) {}
+                        startIdx = jsonEnd + 1;
+                    }
+                    if (startIdx > 0) buffer = buffer.slice(startIdx);
+                }
+            } catch (err) {
+                showToast('连接失败: ' + err.message, 'error');
+            }
+        }
+
+        function openEnvBuildDir() {
+            const workingDir = state.workingDir || document.getElementById('envBuildWorkingDir').value;
+            if (!workingDir) { showToast('请先设置工作目录', 'warning'); return; }
+            window.open('file://' + workingDir + '/env-build');
+        }
+
+        async function saveAndRetryEnvBuild() {
+            const workingDir = state.workingDir || document.getElementById('envBuildWorkingDir').value;
+            if (!workingDir) { showToast('请先设置工作目录', 'warning'); return; }
+
+            const envContent = document.getElementById('previewEnvironment')?.querySelector('pre code')?.textContent;
+            if (!envContent) {
+                showToast('请先在预览中查看修复后的 environment.yml', 'warning');
+                return;
+            }
+
+            // Save the fixed environment.yml first
+            try {
+                const saveResult = await api('/env-build/save-environment', {
+                    method: 'POST',
+                    body: JSON.stringify({ working_dir: workingDir, content: envContent })
+                });
+                if (!saveResult.success) {
+                    showToast('保存失败', 'error');
+                    return;
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+                return;
+            }
+
+            showToast('正在创建Conda环境（自动修复中，最多3次重试）...', 'info');
+            const result = await api('/env-build/create-env-with-fix', {
+                method: 'POST',
+                body: JSON.stringify({ working_dir: workingDir })
+            });
+            if (result.success) {
+                showToast(result.message || 'Conda环境创建成功', 'success');
+            } else {
+                showToast(result.error || '环境创建失败', 'error');
+                if (result.logs) {
+                    const logsEl = document.getElementById('envBuildOutput');
+                    if (logsEl) logsEl.textContent = result.logs.join('\n');
+                }
+            }
+        }
+        // Preview files
+        async function loadPreview(filePath, elementId) {
+            const result = await api(`/env-build/read-file?path=${encodeURIComponent(filePath)}`);
+            if (result.success) {
+                const el = document.getElementById(elementId);
+                // Check if it's a markdown file
+                if (filePath.endsWith('.md')) {
+                    el.innerHTML = parseMarkdown(result.content);
+                } else {
+                    // For yml/sh, use pre/code block
+                    el.innerHTML = '<pre><code>' + escapeHtml(result.content) + '</code></pre>';
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function parseMarkdown(text) {
+            if (!text) return '';
+            let html = text;
+
+            // Escape HTML first
+            html = escapeHtml(html);
+
+            // Code blocks (```...```)
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+            // Preserve ASCII diagrams - detect multi-line blocks with box-drawing chars
+            // Find blocks where lines contain box-drawing characters (┌┐└┘─│├┤┬┴┼)
+            const lines = html.split('\n');
+            const resultLines = [];
+            let inDiagram = false;
+            let diagramLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                // Check if line is part of ASCII diagram (has box chars and is indented or is a box line)
+                const hasBoxChars = /[┌┐└┘├┤┬┴┼]/.test(line);
+                const hasArrows = /[│↓→↑]/.test(line);
+                const isIndentedBox = /^\s+[│]/.test(line);
+
+                if (hasBoxChars || (hasArrows && isIndentedBox)) {
+                    inDiagram = true;
+                    diagramLines.push(line);
+                } else {
+                    if (inDiagram && diagramLines.length > 0) {
+                        resultLines.push('<pre class="ascii-diagram">' + diagramLines.join('\n') + '</pre>');
+                        diagramLines = [];
+                    }
+                    inDiagram = false;
+                    resultLines.push(line);
+                }
+            }
+            if (inDiagram && diagramLines.length > 0) {
+                resultLines.push('<pre class="ascii-diagram">' + diagramLines.join('\n') + '</pre>');
+            }
+            html = resultLines.join('\n');
+
+            // Tables
+            const tableRegex = /^\|(.+)\|\s*\n\|[-:\s|]+\|\s*\n((?:\|.+\|\s*\n?)*)/gm;
+            html = html.replace(tableRegex, function(match, header, body) {
+                const headers = header.split('|').map(h => h.trim()).filter(h => h);
+                const rows = body.trim().split('\n').map(row => row.split('|').map(c => c.trim()).filter(c => c));
+                let table = '<table><thead><tr>';
+                headers.forEach(h => table += '<th>' + h + '</th>');
+                table += '</tr></thead><tbody>';
+                rows.forEach(row => {
+                    table += '<tr>';
+                    row.forEach(cell => table += '<td>' + cell + '</td>');
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                return table;
+            });
+
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Bold
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+            // Line breaks (double newline = paragraph)
+            html = html.replace(/\n\n/g, '</p><p>');
+
+            // Single line breaks to <br> (but not inside pre blocks)
+            const parts = html.split(/(<pre[\s\S]*?<\/pre>)/g);
+            html = parts.map(part => {
+                if (part.startsWith('<pre')) return part;
+                return part.replace(/\n/g, '<br>');
+            }).join('');
+
+            // Wrap in div if empty
+            if (!html.trim()) return '<p>无内容</p>';
+
+            return '<div class="markdown-parsed">' + html + '</div>';
+        }
+
+        // Override preview tab switching to load files
+        const originalSwitchPreviewTab = switchPreviewTab;
+        switchPreviewTab = function(tabName) {
+            originalSwitchPreviewTab(tabName);
+            if (state.envBuildFiles) {
+                const fileMap = { 'supplies': 'previewSupplies', 'environment': 'previewEnvironment', 'install': 'previewInstall', 'manual': 'previewManual' };
+                const nameMap = { 'supplies': 'supplies-list.md', 'environment': 'environment.yml', 'install': 'install.sh', 'manual': 'MANUAL.md' };
+                const file = state.envBuildFiles.find(f => f.name === nameMap[tabName]);
+                if (file) loadPreview(file.path, fileMap[tabName]);
+            }
+        };
+
+        // Dialog
+        function handleDialogKeypress(e) {
+            if (e.key === 'Enter') sendDialogMessage();
+        }
+
+        function sendDialogMessage() {
+            const input = document.getElementById('dialogInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Add to shared messages
+            sharedMessages.push({ type: 'user', text: text });
+            syncDialogMessages();
+            input.value = '';
+
+            // Send to agent API with working directory context
+            const workingDir = state.workingDir || '';
+            const fullMessage = workingDir
+                ? `[工作目录: ${workingDir}]\n\n${text}`
+                : text;
+
+            // Add thinking message to shared messages
+            const thinkingIdx = sharedMessages.length;
+            sharedMessages.push({ type: 'system', text: '思考中...' });
+            syncDialogMessages();
+
+            // Create agent message placeholder
+            const agentMsgIndex = sharedMessages.length;
+            sharedMessages.push({ type: 'agent', text: '' });
+            streamingMsgIdx = agentMsgIndex;
+            syncDialogMessages();
+
+            fetch(`${API_BASE}/agent/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: fullMessage,
+                    working_dir: workingDir
+                })
+            })
+            .then(res => {
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // Process remaining buffer
+                            if (buffer.trim().startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(buffer.trim().slice(6));
+                                    if (data.token) sharedMessages[agentMsgIndex].text += data.token;
+                                    else if (data.error) sharedMessages[agentMsgIndex].text = '错误: ' + data.error;
+                                } catch (e) {}
+                            }
+                            if (sharedMessages[thinkingIdx] && sharedMessages[thinkingIdx].text === '思考中...') {
+                                sharedMessages.splice(thinkingIdx, 1);
+                            }
+                            sharedMessages[agentMsgIndex].text = parseMarkdown(sharedMessages[agentMsgIndex].text);
+                            streamingMsgIdx = null;
+                            syncDialogMessages();
+                            return;
+                        }
+
+                        buffer += decoder.decode(value, { stream: true });
+
+                        // Process all complete JSON objects in buffer
+                        let startIdx = 0;
+                        while (true) {
+                            const dataIdx = buffer.indexOf('data: ', startIdx);
+                            if (dataIdx === -1) break;
+
+                            // Find the JSON object after "data: "
+                            const jsonStart = dataIdx + 6;
+                            let braceCount = 0;
+                            let jsonEnd = -1;
+
+                            for (let i = jsonStart; i < buffer.length; i++) {
+                                if (buffer[i] === '{') {
+                                    braceCount++;
+                                } else if (buffer[i] === '}') {
+                                    braceCount--;
+                                    if (braceCount === 0) {
+                                        jsonEnd = i;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (jsonEnd !== -1) {
+                                const jsonStr = buffer.slice(jsonStart, jsonEnd + 1);
+                                try {
+                                    const data = JSON.parse(jsonStr);
+                                    if (data.token) {
+                                        sharedMessages[agentMsgIndex].text += data.token;
+                                        syncDialogMessages();
+                                    } else if (data.error) {
+                                        sharedMessages[agentMsgIndex].text = '错误: ' + data.error;
+                                        syncDialogMessages();
+                                    }
+                                } catch (e) {
+                                    console.error('JSON parse error:', e, 'jsonStr:', jsonStr, 'buffer:', buffer.substring(0, 100));
+                                }
+                                startIdx = jsonEnd + 1;
+                            } else {
+                                break; // No complete JSON yet
+                            }
+                        }
+
+                        // Keep only unprocessed portion
+                        if (startIdx > 0) {
+                            buffer = buffer.slice(startIdx);
+                        }
+
+                        if (!done) read();
+                    });
+                }
+                read();
+            })
+            .catch(err => {
+                // Remove thinking message
+                if (sharedMessages.length > 0 && sharedMessages[sharedMessages.length - 1].text === '思考中...') {
+                    sharedMessages.pop();
+                }
+                sharedMessages.push({ type: 'agent', text: '连接失败: ' + err.message });
+                streamingMsgIdx = null;
+                syncDialogMessages();
+            });
+        }
+
+        function addDialogMessage(type, text, containerId = 'dialogMessages') {
+            // Add to shared messages
+            sharedMessages.push({ type, text });
+            syncDialogMessages();
+        }
+
+        // EnvBuild Dialog functions
+        function handleEnvBuildDialogKeypress(e) {
+            if (e.key === 'Enter') sendEnvBuildDialogMessage();
+        }
+
+        // ============================================================================
+        // R Data Analysis Functions (Simplified - Card-based Workflow)
+        // ============================================================================
+
+        let rdataWorkingDir = null;
+        let rdataProjectDir = null;
+        let rdataScripts = [];
+        let rdataObjects = [];
+        let currentRDataScript = null;
+
+        // Template scripts based on primary_function.R (matrix only, no visualization)
+        const RDATA_TEMPLATES = [
+            {
+                name: '抽平 (Rarefaction)',
+                input: 'otu_matrix',
+                code: `# 抽平函数
+rarefy_otu <- function(otu_matrix) {
+  raremax <- min(colSums(otu_matrix))
+  rarefied <- as.data.frame(t(rrarefy(t(otu_matrix), raremax)))
+  return(rarefied)
+}
+
+# 执行抽平
+rarefied_data <- rarefy_otu(otu_matrix)
+write.csv(rarefied_data, "rarefied_output.csv", row.names = TRUE)`
+            },
+            {
+                name: 'Alpha 多样性',
+                input: 'otu_matrix',
+                code: `# Alpha多样性计算 (Shannon, Simpson, ACE, Chao1, Richness)
+library(vegan)
+
+calc_alpha <- function(otu) {
+  alpha_div <- as.data.frame(estimateR(t(otu)))
+  diversity_indices <- data.frame(
+    Shannon = diversity(t(otu), index = "shannon"),
+    Simpson = diversity(t(otu), index = "simpson"),
+    S.ACE = alpha_div["S.ACE", ],
+    S.chao1 = alpha_div["S.chao1", ],
+    Richness = alpha_div["S.obs", ]
+  )
+  return(diversity_indices)
+}
+
+alpha_results <- calc_alpha(rarefied_data)
+write.csv(alpha_results, "alpha_diversity.csv", row.names = TRUE)`
+            },
+            {
+                name: '距离矩阵 (Distance Matrix)',
+                input: 'otu_matrix',
+                code: `# 计算距离矩阵 (Bray-Curtis)
+library(vegan)
+
+distance_matrix <- vegdist(t(otu_matrix), method = "bray")
+distance_df <- as.data.frame(as.matrix(distance_matrix))
+write.csv(distance_df, "distance_matrix.csv", row.names = TRUE)`
+            },
+            {
+                name: 'NMDS 排序',
+                input: 'distance_matrix',
+                code: `# NMDS 排序分析
+library(vegan)
+
+nmds_result <- metaMDS(distance_matrix, k = 2)
+nmds_coords <- as.data.frame(nmds_result$points)
+colnames(nmds_coords) <- c("NMDS1", "NMDS2")
+write.csv(nmds_coords, "nmds_coordinates.csv", row.names = TRUE)
+
+# Stress value
+stress_value <- nmds_result$stress
+cat("Stress:", stress_value, "\n")`
+            },
+            {
+                name: 'ANOSIM 检验',
+                input: 'distance_matrix + group',
+                code: `# ANOSIM 统计检验
+library(vegan)
+
+# 假设 group_factor 是分组向量
+anosim_result <- anosim(distance_matrix, group_factor, permutations = 999)
+anosim_stats <- data.frame(
+  statistic = anosim_result$statistic,
+  significance = anosim_result$signif
+)
+write.csv(anosim_stats, "anosim_result.csv", row.names = TRUE)`
+            },
+            {
+                name: '分类学注释处理',
+                input: 'annotation_file',
+                code: `# 分类学注释分隔
+library(dplyr)
+library(tidyr)
+
+process_taxonomy <- function(annomx, cTax = "Taxonomy") {
+  colnames(annomx)[colnames(annomx) == cTax] <- 'd'
+  annomx$d <- gsub('d__', '', annomx$d)
+  taxalist <- c('d', 'k', 'p', 'c', 'o', 'f', 'g', 's')
+
+  for (tx in taxalist[-1]) {
+    annomx <- annomx %>%
+      separate(!!sym(taxalist[which(taxalist == tx) - 1]),
+               sep = paste0(';', tx, '__'),
+               c(taxalist[which(taxalist == tx) - 1], tx))
+  }
+  return(annomx)
+}
+
+taxonomy_processed <- process_taxonomy(taxonomy_df)
+write.csv(taxonomy_processed, "taxonomy_processed.csv", row.names = FALSE)`
+            },
+            {
+                name: '物种丰度汇总',
+                input: 'otu_matrix + taxonomy',
+                code: `# 按分类学单元汇总物种丰度
+library(dplyr)
+
+summarize_by_taxonomy <- function(otu, taxonomy, tax_unit = "Phylum") {
+  merged <- rbind(otu, taxonomy[tax_unit])
+  colnames(merged) <- c(colnames(otu), tax_unit)
+
+  summarized <- merged %>%
+    group_by(.data[[tax_unit]]) %>%
+    summarise(across(where(is.numeric), sum))
+
+  return(as.data.frame(summarized))
+}
+
+abundance_summary <- summarize_by_taxonomy(otu_df, taxonomy_df, "Phylum")
+write.csv(abundance_summary, "abundance_by_phylum.csv", row.names = FALSE)`
+            }
+        ];
+
+        async function selectRDataWorkingDir() {
+            const result = await api('/dialog/select-folder');
+            if (result.path) {
+                rdataWorkingDir = result.path;
+                document.getElementById('rdataWorkingDirDisplay').textContent = result.path;
+                document.getElementById('rdataWorkingDir').textContent = result.path;
+                await loadRDataProject();
+            }
+        }
+
+        async function loadRDataProject() {
+            await refreshRDataTemplates();
+        }
+
+        async function refreshRDataTemplates() {
+            showToast('正在加载模板...', 'info');
+            const result = await api('/rdata/templates/list');
+            if (result.error || !result.templates) {
+                // Fallback: use embedded templates
+                if (typeof RDATA_TEMPLATES !== 'undefined' && RDATA_TEMPLATES.length > 0) {
+                    rdataScripts = RDATA_TEMPLATES.map(t => ({
+                        name: t.name,
+                        dir: t.name,  // embeded templates have no dir
+                        type: t.type,
+                        code: t.code,
+                        description: t.description || ''
+                    }));
+                    renderAnalysisCards();
+                    await loadRDataObjects();
+                    showToast('已加载 ' + rdataScripts.length + ' 个内置模板', 'success');
+                } else {
+                    showToast('加载模板失败: ' + (result.error || '无可用模板'), 'error');
+                }
+                return;
+            }
+            if (result.templates && result.templates.length > 0) {
+                rdataScripts = result.templates.map(t => ({
+                    name: t.name,
+                    dir: t.dir,
+                    type: t.type,
+                    code: t.code,
+                    description: t.description,
+                    config: t.config || {}
+                }));
+            } else {
+                rdataScripts = [];
+            }
+            renderAnalysisCards();
+            await loadRDataObjects();
+            showToast('已加载 ' + rdataScripts.length + ' 个模板', 'success');
+        }
+
+        async function loadRDataObjects() {
+            const result = await api('/rdata/session/objects?session_id=rdata');
+            rdataObjects = result.objects || [];
+        }
+
+        function renderAnalysisCards() {
+            const container = document.getElementById('analysisCardsContainer');
+            if (!rdataScripts || rdataScripts.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>暂无分析模板</p></div>';
+                return;
+            }
+            container.innerHTML = rdataScripts.map((tpl, idx) =>
+                `<div class="workflow-card">
+                    <div class="workflow-card-header" style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px;min-height:80px;background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);border-bottom:1px solid var(--border);">
+                        <div class="workflow-card-title">
+                            <span class="workflow-number">${idx + 1}</span>
+                            <div>
+                                <strong>${tpl.name}</strong>
+                                <p class="workflow-desc">${tpl.description || ''}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="workflow-card-footer">
+                        <button class="btn btn-primary btn-small" onclick="openTemplateConfigModal('${tpl.dir}')">配置</button>
+                        <button class="btn btn-secondary btn-small" onclick="quickExecuteCard('${tpl.dir}')">执行</button>
+                    </div>
+                </div>`
+            ).join('');
+        }
+
+        async function quickExecuteCard(dir) {
+            const tpl = rdataScripts.find(t => t.dir === dir);
+            if (!tpl) return;
+            const config = tpl.config;
+            const inputs = config.inputs || [];
+            const params = config.params || [];
+
+            let code = tpl.code;
+            inputs.forEach(inp => {
+                const el = document.getElementById(`modal-${inp.name}`);
+                if (el && el.value) {
+                    code = code.replace(new RegExp(`\\{${inp.name}\\}`, 'g'), el.value);
+                }
+            });
+            params.forEach(p => {
+                const el = document.getElementById(`modal-${p.name}`);
+                if (el && el.value) {
+                    code = code.replace(new RegExp(`\\{${p.name}\\}`, 'g'), el.value);
+                }
+            });
+
+            const log = document.getElementById('rdataLogOutput');
+            log.textContent = `正在执行: ${tpl.name}...\n`;
+            const result = await api('/rdata/run', { method: 'POST', body: { session_id: 'rdata', project_dir: rdataWorkingDir || '', script: code }});
+            log.textContent += result.stdout || '';
+            log.textContent += '\n' + (result.stderr || '');
+            await loadRDataObjects();
+            showToast(result.error ? '执行失败' : '执行完成', result.error ? 'error' : 'success');
+        }
+
+        let currentTemplateDir = null;
+
+        function openTemplateConfigModal(dir) {
+            const tpl = rdataScripts.find(t => t.dir === dir);
+            if (!tpl) return;
+            currentTemplateDir = dir;
+
+            const config = tpl.config;
+            document.getElementById('rScriptModalTitle').textContent = tpl.name;
+            document.getElementById('rScriptDescription').value = tpl.description || '';
+            document.getElementById('rScriptConfig').value = JSON.stringify(config);
+
+            const inputs = config.inputs || [];
+            const params = config.params || [];
+
+            let inputsHtml = '<div style="margin-bottom:12px;"><label style="display:block;margin-bottom:4px;font-weight:600;">输入数据</label>';
+            inputs.forEach(inp => {
+                const opts = rdataObjects.map(o => `<option value="${o}">${o}</option>`).join('');
+                inputsHtml += `<div style="margin-bottom:8px;">
+                    <label style="font-size:0.85rem;">${inp.label || inp.name}</label>
+                    <select id="modal-${inp.name}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                        <option value="">请选择...</option>
+                        ${opts}
+                    </select>
+                </div>`;
+            });
+            inputsHtml += '</div>';
+            document.getElementById('rScriptInputsContainer').innerHTML = inputsHtml;
+
+            let paramsHtml = '';
+            params.forEach(p => {
+                if (p.type === 'select') {
+                    const opts = (p.options || []).map(o =>
+                        `<option value="${typeof o === 'object' ? o.value : o}">${typeof o === 'object' ? o.label : o}</option>`
+                    ).join('');
+                    paramsHtml += `<div style="margin-bottom:8px;">
+                        <label style="display:block;margin-bottom:4px;">${p.label || p.name}</label>
+                        <select id="modal-${p.name}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                            ${opts}
+                        </select>
+                    </div>`;
+                }
+            });
+            document.getElementById('rScriptParamsContainer').innerHTML = paramsHtml;
+            document.getElementById('rScriptCode').value = tpl.code;
+
+            openModal('rScriptModal');
+        }
+
+        async function runRScriptFromModal() {
+            if (!currentTemplateDir) return;
+            const tpl = rdataScripts.find(t => t.dir === currentTemplateDir);
+            if (!tpl) return;
+            const config = tpl.config;
+            closeModal('rScriptModal');
+
+            let code = tpl.code;
+            (config.inputs || []).forEach(inp => {
+                const el = document.getElementById(`modal-${inp.name}`);
+                if (el && el.value) {
+                    code = code.replace(new RegExp(`\\{${inp.name}\\}`, 'g'), el.value);
+                }
+            });
+            (config.params || []).forEach(p => {
+                const el = document.getElementById(`modal-${p.name}`);
+                if (el && el.value) {
+                    code = code.replace(new RegExp(`\\{${p.name}\\}`, 'g'), el.value);
+                }
+            });
+
+            const log = document.getElementById('rdataLogOutput');
+            log.textContent = `正在执行: ${tpl.name}...\n`;
+            const result = await api('/rdata/run', { method: 'POST', body: { session_id: 'rdata', project_dir: rdataWorkingDir || '', script: code }});
+            log.textContent += result.stdout || '';
+            log.textContent += '\n' + (result.stderr || '');
+            updateObjectSelects();
+            showToast(result.error ? '执行失败' : '执行完成', result.error ? 'error' : 'success');
+        }
+
+        function saveRScriptToProject() {
+            if (!currentTemplateDir) return;
+            const tpl = rdataScripts.find(t => t.dir === currentTemplateDir);
+            if (!tpl) return;
+            const config = JSON.parse(document.getElementById('rScriptConfig').value || '{}');
+            tpl.code = document.getElementById('rScriptCode').value;
+            showToast('脚本已保存', 'success');
+        }
+
+        async function createRDataProject() {
+            if (!rdataWorkingDir) { showToast('请先选择工作目录', 'warning'); return; }
+            const projectName = prompt('请输入项目名称:');
+            if (!projectName) return;
+
+            const result = await api('/rdata/project/create', {
+                method: 'POST',
+                body: { project_name: projectName, working_dir: rdataWorkingDir }
+            });
+
+            if (result.error) { showToast(result.error, 'error'); return; }
+            rdataProjectDir = result.project_dir;
+            const name = projectName || rdataProjectDir.split('/').pop();
+            document.getElementById('rdataProjectName').textContent = name;
+            await refreshRDataTemplates();
+            showToast('项目创建成功', 'success');
+        }
+
+        async function loadRDataSession() {
+            if (!rdataWorkingDir) { showToast('请先选择工作目录', 'warning'); return; }
+            const result = await api('/rdata/session/load', {
+                method: 'POST',
+                body: { session_id: 'rdata', project_dir: rdataWorkingDir }
+            });
+            if (result.success) showToast('会话加载成功', 'success');
+        }
+
+        function renderRDataWorkflowCards() {
+            const container = document.getElementById('rdataWorkflowCards');
+            if (!rdataScripts || rdataScripts.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>暂无脚本，请点击"刷新模板"按钮加载</p></div>';
+                return;
+            }
+            container.innerHTML = rdataScripts.map((s, i) =>
+                '<div class="workflow-card" onclick="openRDataScriptModal(' + i + ')"' +
+                'style="cursor:pointer; padding:12px; border:1px solid var(--border); border-radius:8px; background:#f8fafc;">' +
+                '<div style="font-weight:600; margin-bottom:4px;">' + s.name + '</div>' +
+                '<div style="font-size:0.8rem; color:var(--text-light);">' + (s.description || s.input || '未设置') + '</div>' +
+                '</div>'
+            ).join('');
+        }
+
+        function openRDataScriptModal(index) {
+            currentRDataScript = rdataScripts[index];
+            document.getElementById('rScriptModalTitle').textContent = currentRDataScript.name;
+            document.getElementById('rScriptName').value = currentRDataScript.name;
+            document.getElementById('rScriptDescription').value = currentRDataScript.description || '';
+            document.getElementById('rScriptCode').value = currentRDataScript.code || '';
+
+            // Store config as JSON
+            const config = currentRDataScript.config || {};
+            document.getElementById('rScriptConfig').value = JSON.stringify(config);
+
+            // Render param fields
+            renderRScriptParams(config.params || []);
+
+            // Render input selectors
+            renderRScriptInputs(config.inputs || []);
+
+            openModal('rScriptModal');
+        }
+
+        function renderRScriptParams(params) {
+            const container = document.getElementById('rScriptParamsContainer');
+            if (!params || params.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = '<div style="margin-bottom:12px;font-weight:600;">参数配置</div>' +
+                params.map(p => {
+                    if (p.type === 'select') {
+                        return `<div style="margin-bottom:12px;">
+                            <label style="display:block;margin-bottom:4px;">${p.label || p.name}</label>
+                            <select id="rParam_${p.name}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                                ${(p.options || []).map(o => `<option value="${o}">${o}</option>`).join('')}
+                            </select>
+                            ${p.description ? `<small style="color:var(--text-light);">${p.description}</small>` : ''}
+                        </div>`;
+                    } else if (p.type === 'number') {
+                        return `<div style="margin-bottom:12px;">
+                            <label style="display:block;margin-bottom:4px;">${p.label || p.name}</label>
+                            <input type="number" id="rParam_${p.name}" value="${(p.default !== null && p.default !== undefined && p.default !== '') ? p.default : 0}"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                            ${p.description ? `<small style="color:var(--text-light);">${p.description}</small>` : ''}
+                        </div>`;
+                    } else if (p.type === 'text') {
+                        return `<div style="margin-bottom:12px;">
+                            <label style="display:block;margin-bottom:4px;">${p.label || p.name}</label>
+                            <input type="text" id="rParam_${p.name}" value="${p.default || ''}"
+                                style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                            ${p.description ? `<small style="color:var(--text-light);">${p.description}</small>` : ''}
+                        </div>`;
+                    } else if (p.type === 'multiselect') {
+                        return `<div style="margin-bottom:12px;">
+                            <label style="display:block;margin-bottom:4px;">${p.label || p.name}</label>
+                            <select id="rParam_${p.name}" multiple style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                                ${(p.options || []).map(o => `<option value="${o}">${o}</option>`).join('')}
+                            </select>
+                            ${p.description ? `<small style="color:var(--text-light);">${p.description}</small>` : ''}
+                        </div>`;
+                    }
+                    return '';
+                }).join('');
+        }
+
+        function renderRScriptInputs(inputs) {
+            const container = document.getElementById('rScriptInputsContainer');
+            if (!inputs || inputs.length === 0) {
+                container.innerHTML = `<label style="display:block;margin-bottom:4px;">输入数据</label>
+                    <select id="rScriptInput" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                        <option value="">请选择...</option>
+                    </select>`;
+                return;
+            }
+            container.innerHTML = '<div style="margin-bottom:12px;font-weight:600;">输入数据</div>' +
+                inputs.map((inp, i) => `<div style="margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:4px;">${inp.label || inp.name}${inp.required ? ' *' : ''}</label>
+                    <select id="rScriptInput_${i}" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;">
+                        <option value="">请选择...</option>
+                    </select>
+                    ${inp.description ? `<small style="color:var(--text-light);">${inp.description}</small>` : ''}
+                </div>`).join('');
+        }
+
+        function saveRScriptToProject() {
+            if (!currentRDataScript) return;
+            currentRDataScript.name = document.getElementById('rScriptName').value;
+            currentRDataScript.input = document.getElementById('rScriptInput').value;
+            currentRDataScript.code = document.getElementById('rScriptCode').value;
+            showToast('脚本已保存到项目', 'success');
+            renderRDataWorkflowCards();
+        }
+
+        function runRScriptFromModal() {
+            if (!currentRDataScript) return;
+            const code = document.getElementById('rScriptCode').value;
+            closeModal('rScriptModal');
+
+            const log = document.getElementById('rdataLogOutput');
+            log.textContent = '正在执行: ' + currentRDataScript.name + '\n';
+
+            api('/rdata/run', {
+                method: 'POST',
+                body: {
+                    session_id: 'rdata',
+                    project_dir: rdataWorkingDir || '',
+                    script: code
+                }
+            }).then(result => {
+                log.textContent += result.stdout || '';
+                log.textContent += '\n' + (result.stderr || '');
+                if (result.error) showToast(result.error, 'error');
+                else showToast('执行完成', 'success');
+            });
+        }
+
+        function saveRDataScript() {
+            if (!currentRDataScript) return;
+            currentRDataScript.name = document.getElementById('rdataScriptName').value;
+            currentRDataScript.input = document.getElementById('rdataScriptInput').value;
+            currentRDataScript.code = document.getElementById('rdataScriptCode').value;
+            renderRDataWorkflowCards();
+            showToast('脚本已保存', 'success');
+        }
+
+        async function runRDataScript() {
+            if (!currentRDataScript || !rdataWorkingDir) return;
+            const log = document.getElementById('rdataLogOutput');
+            log.textContent = '正在执行...\n';
+
+            const result = await api('/rdata/run', {
+                method: 'POST',
+                body: {
+                    session_id: 'rdata',
+                    project_dir: rdataWorkingDir,
+                    script: currentRDataScript.code
+                }
+            });
+
+            log.textContent = result.stdout || '';
+            log.textContent += '\n' + (result.stderr || '');
+            if (result.error) showToast(result.error, 'error');
+            else showToast('执行完成', 'success');
+        }
+
+        function deleteRDataScript() {
+            if (!currentRDataScript) return;
+            const idx = rdataScripts.indexOf(currentRDataScript);
+            if (idx > -1) rdataScripts.splice(idx, 1);
+            currentRDataScript = null;
+            document.getElementById('rdataScriptConfigPanel').style.display = 'none';
+            renderRDataWorkflowCards();
+            showToast('已删除', 'success');
+        }
+
+        function importRDataScript() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.R,.r';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const code = ev.target.result;
+                    const name = file.name.replace(/\.R$/, '');
+                    rdataScripts.push({ id: Date.now(), name, input: '', code });
+                    renderRDataWorkflowCards();
+                    showToast('脚本已导入', 'success');
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function handleRDataFileUpload(input, type) {
+            const file = input.files[0];
+            if (!file) return;
+            const isTSV = file.name.endsWith('.tsv') || file.name.endsWith('.txt');
+            const sep = isTSV ? '\\t' : ',';
+            let varName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_]/g, '_');
+            if (type) varName = type + '_' + varName;
+
+            const log = document.getElementById('rdataLogOutput');
+            log.textContent = `正在上传: ${file.name}\n`;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                const lines = content.split('\n');
+                const preview = lines.slice(0, 3).join('\n');
+                log.textContent += `预览 (前3行):\n${preview}\n`;
+
+                api('/rdata/import', {
+                    method: 'POST',
+                    body: {
+                        session_id: 'rdata',
+                        project_dir: rdataWorkingDir || '',
+                        filename: file.name,
+                        var_name: varName,
+                        separator: sep,
+                        content: content
+                    }
+                }).then(result => {
+                    if (result.success) {
+                        log.textContent += `导入成功: ${varName} (${result.rows} 行)\n`;
+                        showToast(`已导入 ${varName}`, 'success');
+                        updateObjectSelects();
+                    } else {
+                        log.textContent += `错误: ${result.error}\n`;
+                        showToast(result.error || '导入失败', 'error');
+                    }
+                }).catch(err => {
+                    log.textContent += `错误: ${err}\n`;
+                    showToast('导入失败', 'error');
+                });
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        async function listRDataObjects() {
+            const result = await api('/rdata/session/objects?session_id=rdata');
+            const objects = result.objects || [];
+            const container = document.getElementById('rdataObjectsList');
+            if (objects.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-light);">暂无对象</div>';
+            } else {
+                container.innerHTML = objects.map(obj =>
+                    `<div class="rdata-object-item" onclick="previewRDataObject('${obj}')" style="padding:4px 0;cursor:pointer;">${obj}</div>`
+                ).join('');
+            }
+        }
+
+        async function previewRDataObject(objName) {
+            const result = await api('/rdata/session/command', {
+                method: 'POST',
+                body: {
+                    session_id: 'rdata',
+                    command: `head(${objName}, 10)`
+                }
+            });
+            document.getElementById('rdataPreviewContent').innerHTML =
+                `<pre style="white-space:pre-wrap;font-size:0.8rem;">${result.stdout || '无输出'}</pre>`;
+        }
+
+        function updateObjectSelects() {
+            listRDataObjects().then(() => {});
+            const selects = ['card-rarefy-matrix','card-matrix-src','card-annotation-src','card-alpha-matrix','card-alpha-group',
+                           'card-beta-matrix','card-beta-group','card-viz-data','rdataTaxonomySelect'];
+            api('/rdata/session/objects?session_id=rdata').then(result => {
+                const objects = result.objects || [];
+                selects.forEach(id => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    const current = sel.value;
+                    const opts = objects.map(o => `<option value="${o}">${o}</option>`).join('');
+                    sel.innerHTML = (id.includes('Select') ? '<option value="">选择注释列...</option>' : '<option value="">请选择...</option>') + opts;
+                    sel.value = current;
+                });
+            });
+        }
+
+        async function processTaxonomyWithLLM() {
+            const prompt = document.getElementById('rdataTaxonomyPrompt').value;
+            if (!prompt) { showToast('请输入 prompt', 'warning'); return; }
+            showToast('正在调用 LLM 处理注释...', 'info');
+        }
+
+        async function generateRDataWorkflow() {
+            showToast('请通过 Agent 对话生成自定义脚本', 'info');
+        }
+
+        function handleRDataDialogKeypress(e) {
+            if (e.key === 'Enter') sendRDataDialogMessage();
+        }
+
+        function sendRDataDialogMessage() {
+            const input = document.getElementById('rdataDialogInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addDialogMessage('user', text, 'rdataDialogMessages');
+            input.value = '';
+
+            const workingDir = rdataWorkingDir || '';
+            const fullMessage = workingDir ? '[' + workingDir + ']\n\n' + text : text;
+
+            sharedMessages.push({ type: 'system', text: '思考中...' });
+            syncDialogMessages();
+
+            const agentMsgIndex = sharedMessages.length;
+            sharedMessages.push({ type: 'agent', text: '' });
+
+            fetch(API_BASE + '/agent/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: fullMessage, working_dir: workingDir })
+            })
+            .then(res => res.body.getReader())
+            .then(reader => {
+                let buffer = '';
+                function read() {
+                    reader.read().then(({ value, done }) => {
+                        if (done) { syncDialogMessages(); return; }
+                        buffer += new TextDecoder().decode(value);
+                        let jsonEnd = buffer.lastIndexOf('}');
+                        if (jsonEnd !== -1) {
+                            try {
+                                const data = JSON.parse(buffer.slice(0, jsonEnd + 1));
+                                if (data.token) sharedMessages[agentMsgIndex].text += data.token;
+                            } catch (e) {}
+                            buffer = buffer.slice(jsonEnd + 1);
+                        }
+                        if (!done) read();
+                    });
+                }
+                read();
+            })
+            .catch(err => { sharedMessages[agentMsgIndex].text = '错误: ' + err.message; syncDialogMessages(); });
+        }
+
+        function sendEnvBuildDialogMessage() {
+            const input = document.getElementById('envBuildDialogInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Add to shared messages
+            sharedMessages.push({ type: 'user', text: text });
+            syncDialogMessages();
+            input.value = '';
+
+            const workingDir = state.workingDir || '';
+            const fullMessage = workingDir
+                ? `[工作目录: ${workingDir}]\n\n${text}`
+                : text;
+
+            // Add thinking message
+            const thinkingIdx = sharedMessages.length;
+            sharedMessages.push({ type: 'system', text: '思考中...' });
+            syncDialogMessages();
+
+            // Create agent message placeholder
+            const agentMsgIndex = sharedMessages.length;
+            sharedMessages.push({ type: 'agent', text: '' });
+            streamingMsgIdx = agentMsgIndex;
+            syncDialogMessages();
+
+            fetch(`${API_BASE}/agent/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: fullMessage,
+                    working_dir: workingDir
+                })
+            })
+            .then(res => {
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            if (sharedMessages[thinkingIdx] && sharedMessages[thinkingIdx].text === '思考中...') {
+                                sharedMessages.splice(thinkingIdx, 1);
+                            }
+                            sharedMessages[agentMsgIndex].text = parseMarkdown(sharedMessages[agentMsgIndex].text);
+                            streamingMsgIdx = null;
+                            syncDialogMessages();
+                            return;
+                        }
+                        buffer += decoder.decode(value, { stream: true });
+                        let startIdx = 0;
+                        while (true) {
+                            const dataIdx = buffer.indexOf('data: ', startIdx);
+                            if (dataIdx === -1) break;
+                            const jsonStart = dataIdx + 6;
+                            let braceCount = 0, jsonEnd = -1;
+                            for (let i = jsonStart; i < buffer.length; i++) {
+                                if (buffer[i] === '{') braceCount++;
+                                else if (buffer[i] === '}') {
+                                    braceCount--;
+                                    if (braceCount === 0) { jsonEnd = i; break; }
+                                }
+                            }
+                            if (jsonEnd !== -1) {
+                                const jsonStr = buffer.slice(jsonStart, jsonEnd + 1);
+                                try {
+                                    const data = JSON.parse(jsonStr);
+                                    if (data.token) {
+                                        sharedMessages[agentMsgIndex].text += data.token;
+                                        syncDialogMessages();
+                                    } else if (data.error) {
+                                        sharedMessages[agentMsgIndex].text = '错误: ' + data.error;
+                                        syncDialogMessages();
+                                    }
+                                } catch (e) {}
+                                startIdx = jsonEnd + 1;
+                            } else break;
+                        }
+                        if (startIdx > 0) buffer = buffer.slice(startIdx);
+                        if (!done) read();
+                    });
+                }
+                read();
+            })
+            .catch(err => {
+                if (sharedMessages[thinkingIdx] && sharedMessages[thinkingIdx].text === '思考中...') {
+                    sharedMessages.splice(thinkingIdx, 1);
+                }
+                if (sharedMessages[agentMsgIndex]) {
+                    sharedMessages[agentMsgIndex].text = '连接失败: ' + err.message;
+                }
+                streamingMsgIdx = null;
+                syncDialogMessages();
+            });
+        }
+
+        // Init
+        updateServerStatus();
+        syncDialogMessages();
+    </script>
+</body>
+</html>

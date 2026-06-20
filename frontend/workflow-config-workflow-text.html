@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Workflow Configuration: workflow-text (Validation Passed)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    margin: 0;
+    padding: 32px;
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .page-title {
+    margin: 0 0 4px 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+  .page-subtitle {
+    margin: 0 0 24px 0;
+    color: #64748b;
+    font-size: 0.9rem;
+  }
+  .modal {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+    max-width: 760px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+  .modal-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .modal-close {
+    border: none;
+    background: transparent;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: #64748b;
+  }
+  .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: #f8fafc;
+  }
+  .config-step {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .config-step > div:first-child { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .btn {
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #ffffff;
+  }
+  .btn-primary { background: #2563eb; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-success { background: #16a34a; }
+  .btn-success:hover { background: #15803d; }
+  .btn-small { padding: 4px 10px; font-size: 0.8rem; }
+
+  .section-label {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  .section-label.required { color: #ef4444; }
+  .section-label.optional { color: #64748b; }
+  .param-row {
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 6px;
+  }
+  .param-row.required { background: #fef2f2; border-left: 3px solid #ef4444; }
+  .param-row.optional { background: #f8fafc; border-left: 3px solid #e2e8f0; }
+  .param-row label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  .param-row label small {
+    font-weight: normal;
+    color: #64748b;
+    font-size: 0.8rem;
+  }
+  .param-row small.desc {
+    color: #64748b;
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+  }
+  .param-row input[type=text],
+  .param-row input[type=number],
+  .param-row select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  .param-row input[type=checkbox] { margin-right: 6px; }
+  .badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    margin-left: 6px;
+  }
+  .badge-user { background: #fee2e2; color: #991b1b; }
+  .badge-workflow { background: #d1fae5; color: #065f46; }
+
+  .view-switch {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .view-switch button {
+    flex: 1;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .view-switch button.active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+  }
+  .badge-pill {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    margin-left: 8px;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Workflow Configuration: workflow-text</h1>
+<p class="page-subtitle">
+  Generated from <code>workflows/workflow-text/params.json</code> via <code>/api/workflow/render-config/workflow-text</code>
+  <span class="badge-pill">All 7 steps: validation passed ✅</span>
+</p>
+
+<div class="view-switch">
+  <button class="active" onclick="showView('list', this)">Step list</button>
+  <button onclick="showView('configure', this)">Configure: Step 3 (trim primers & filter quality)</button>
+</div>
+
+<!-- ================= View 1: step list (rendered by /api/workflow/render-config) ================= -->
+<div id="view-list" class="modal">
+  <div class="modal-header">
+    <div class="modal-title">Workflow Configuration: workflow-text</div>
+    <button class="modal-close">×</button>
+  </div>
+  <div class="modal-body">
+    <form id="workflow-config-form">
+
+      <div class="config-step">
+        <div>
+          <div><strong>1 merge paired-end reads</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>2 relabel merged sequences</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>3 trim primers and filter quality</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>4 dereplicate sequences</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>5 ASV clustering (denoising)</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>6 reference-based chimera filtering</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div>
+          <div><strong>7 map reads to ASV and generate abundance table</strong> <span style="color: #64748b;">(usearch)</span></div>
+          <div>
+            <span title="Parameters retrieved" style="margin-right: 12px;">✅</span>
+            <button type="button" class="btn btn-primary btn-small">配置</button>
+            <button type="button" class="btn btn-success btn-small" style="margin-left: 8px;">执行</button>
+          </div>
+        </div>
+      </div>
+
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary">Save Configuration</button>
+  </div>
+</div>
+
+<!-- ================= View 2: step-level configure form ================= -->
+<div id="view-configure" class="modal" style="display:none;">
+  <div class="modal-header">
+    <div class="modal-title">Configure: trim primers and filter quality (usearch)</div>
+    <button class="modal-close">×</button>
+  </div>
+  <div class="modal-body">
+    <div class="step-config-body">
+
+      <div class="section-label required"><strong>Required Parameters</strong></div>
+
+      <div class="param-row required">
+        <label>Input FASTQ <span style="color:#ef4444;">*</span> <span class="badge badge-workflow">Internal File</span> <small>(string)</small></label>
+        <input type="text" name="-fastx_filter" value="merged_relabeled.fastq">
+        <small class="desc">trim and filter sequences in FASTA/FASTQ file</small>
+      </div>
+
+      <div class="param-row required">
+        <label>Filtered FASTA output <span style="color:#ef4444;">*</span> <span class="badge badge-workflow">Internal File</span> <small>(string)</small></label>
+        <input type="text" name="-fastaout" value="filtered.fasta">
+        <small class="desc">FASTA output for filtered sequences</small>
+      </div>
+
+      <div class="section-label optional">
+        <strong>Optional Parameters</strong>
+        <button onclick="toggleOptional(this)" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:0.8rem;margin-left:6px;">Collapse</button>
+      </div>
+      <div id="optionalParamsContainer">
+
+        <div class="param-row optional">
+          <label>Truncate at length <span class="badge badge-workflow">Internal File</span> <small>(numeric)</small></label>
+          <input type="number" name="-fastq_trunclen" value="250" placeholder="250">
+          <small class="desc">truncate sequences at the specified length</small>
+        </div>
+
+        <div class="param-row optional">
+          <label>Min tail quality <span class="badge badge-workflow">Internal File</span> <small>(numeric)</small></label>
+          <input type="number" name="-fastq_truncqual" value="20" placeholder="20">
+          <small class="desc">truncate at first base with quality below threshold</small>
+        </div>
+
+        <div class="param-row optional">
+          <label>Max expected errors <span class="badge badge-workflow">Internal File</span> <small>(numeric)</small></label>
+          <input type="number" name="-fastq_maxee" value="1.0" placeholder="1.0">
+          <small class="desc">discard sequences with more than this many expected errors</small>
+        </div>
+
+        <div class="param-row optional">
+          <label>FASTA line width <span class="badge badge-workflow">Internal File</span> <small>(numeric)</small></label>
+          <input type="number" name="-fasta_width" value="0" placeholder="0">
+          <small class="desc">number of characters per line in FASTA output (0 = single line)</small>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary">Save Configuration</button>
+  </div>
+</div>
+
+<script>
+  function showView(name, btn) {
+    document.getElementById('view-list').style.display = name === 'list' ? 'block' : 'none';
+    document.getElementById('view-configure').style.display = name === 'configure' ? 'block' : 'none';
+    document.querySelectorAll('.view-switch button').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+  function toggleOptional(btn) {
+    var c = document.getElementById('optionalParamsContainer');
+    if (c.style.display === 'none') { c.style.display = 'block'; btn.textContent = 'Collapse'; }
+    else { c.style.display = 'none'; btn.textContent = 'Expand'; }
+  }
+</script>
+
+</body>
+</html>

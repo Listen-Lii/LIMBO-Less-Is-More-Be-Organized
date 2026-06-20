@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>LLM Analysis Process</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #1e293b; color: #e2e8f0; margin: 0; }
+        h2 { color: #60a5fa; margin-bottom: 20px; }
+        .section { margin-bottom: 20px; padding: 15px; background: #0f172a; border-radius: 8px; }
+        .section h3 { color: #f59e0b; margin-bottom: 10px; font-size: 0.9rem; }
+        pre { white-space: pre-wrap; word-break: break-all; font-size: 0.8rem; max-height: 200px; overflow-y: auto; }
+        .status { padding: 10px; border-radius: 6px; margin: 10px 0; }
+        .status.active { background: #1e40af; }
+        .status.done { background: #065f46; }
+        .status.error { background: #991b1b; }
+        .step-item { display: flex; align-items: center; padding: 8px; border-bottom: 1px solid #334155; }
+        .step-item:last-child { border-bottom: none; }
+        .step-icon { width: 24px; height: 24px; border-radius: 50%; margin-right: 10px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .step-icon.pending { background: #475569; }
+        .step-icon.active { background: #1d4ed8; animation: pulse 1s infinite; }
+        .step-icon.done { background: #059669; }
+        .step-icon.error { background: #dc2626; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <h2>LLM Analysis Process</h2>
+    <div id="status"></div>
+    <div id="steps"></div>
+    <div class="section" id="prompt-section" style="display:none">
+        <h3>[OUT] Prompt Sent</h3>
+        <pre id="prompt-content"></pre>
+    </div>
+    <div class="section" id="response-section" style="display:none">
+        <h3>[IN] LLM Response</h3>
+        <pre id="response-content"></pre>
+    </div>
+    <div class="section" id="result-section" style="display:none">
+        <h3>[OK] Analysis Result</h3>
+        <pre id="result-content"></pre>
+    </div>
+    <script>
+        function updateStatus(msg, type) {
+            document.getElementById("status").innerHTML = '<div class="status ' + (type||"") + '">' + msg + '</div>';
+        }
+        function updateSteps(steps) {
+            document.getElementById("steps").innerHTML = steps.map(function(s) {
+                var iconClass = s.status || "pending";
+                var icon = iconClass === "done" ? "OK" : iconClass === "active" ? ".." : iconClass === "error" ? "XX" : "o ";
+                return '<div class="step-item"><div class="step-icon ' + iconClass + '">' + icon + '</div><div>' + (s.name||"") + (s.software ? " " + s.software : "") + '</div></div>';
+            }).join("");
+        }
+        function showPrompt(text) {
+            document.getElementById("prompt-section").style.display = "block";
+            document.getElementById("prompt-content").textContent = text;
+        }
+        function showResponse(text) {
+            document.getElementById("response-section").style.display = "block";
+            document.getElementById("response-content").textContent = text;
+        }
+        function showResult(text) {
+            document.getElementById("result-section").style.display = "block";
+            document.getElementById("result-content").textContent = text;
+        }
+    </script>
+</body>
+</html>
