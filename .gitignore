@@ -1,0 +1,27 @@
+# Logs and runtime state
+logs/
+*.log
+state.json
+user_config.json
+server_profiles.json
+
+# OpenClaw credentials (use openclaw.json.template instead)
+openclaw.json
+.openclaw/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Generated workflow artifacts
+workflows/*/config.json.bak

@@ -1,0 +1,9 @@
+{
+  "_comment": "OpenClaw Gateway configuration template. Rename this file to 'openclaw.json' and place it at the path configured in OPENCLAW_TOKEN_PATH (default: ~/.openclaw/openclaw.json). DO NOT commit the real openclaw.json with your actual token.",
+  "token": "<your-openclaw-token-here>",
+  "api_key": "<your-openclaw-api-key-here>",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 18789
+  }
+}
