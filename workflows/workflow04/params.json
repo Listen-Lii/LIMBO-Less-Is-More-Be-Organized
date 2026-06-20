@@ -1,0 +1,513 @@
+{
+  "steps": [
+    {
+      "step": "2.1",
+      "name": "merge paired-end reads",
+      "software": "vsearch",
+      "query_status": "success",
+      "params": [
+        {
+          "name": "--fastq_mergepairs",
+          "label": "\u6b63\u5411FASTQ\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "specify FASTQ file with forward reads"
+        },
+        {
+          "name": "--reverse",
+          "label": "\u53cd\u5411FASTQ\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "specify FASTQ file with reverse reads"
+        },
+        {
+          "name": "--fastqout",
+          "label": "\u5408\u5e76\u540eFASTQ\u8f93\u51fa",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "FASTQ output filename for merged sequences"
+        },
+        {
+          "name": "--fastaout",
+          "label": "\u5408\u5e76\u540eFASTA\u8f93\u51fa",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "FASTA output filename for merged sequences"
+        },
+        {
+          "name": "--relabel",
+          "label": "\u5e8f\u5217\u91cd\u547d\u540d\u524d\u7f00",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "both",
+          "source": "workflow",
+          "description": "suffix to append to label of merged sequences"
+        },
+        {
+          "name": "--fastq_minlen",
+          "label": "\u6700\u5c0f\u8f93\u5165\u8bfb\u957f",
+          "type": "numeric",
+          "required": false,
+          "default": "1",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "minimum input read length after truncation"
+        },
+        {
+          "name": "--fastq_maxee",
+          "label": "\u6700\u5927\u671f\u671b\u8bef\u5dee\u503c",
+          "type": "numeric",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "maximum expected error value for merged sequence"
+        },
+        {
+          "name": "--fastq_maxdiffs",
+          "label": "\u6700\u5927\u4e0d\u540c\u78b1\u57fa\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "10",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "maximum number of different bases in overlap"
+        },
+        {
+          "name": "--fastq_maxns",
+          "label": "\u6700\u5927N\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "maximum number of N's"
+        }
+      ]
+    },
+    {
+      "step": "2.2",
+      "name": "relabel pre-merged reads",
+      "software": "usearch",
+      "query_status": "failed",
+      "params": []
+    },
+    {
+      "step": "3",
+      "name": "primer removal & QC",
+      "software": "vsearch",
+      "query_status": "success",
+      "params": [
+        {
+          "name": "--fastx_filter",
+          "label": "\u8f93\u5165\u5408\u5e76FASTQ\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "workflow",
+          "description": "trim and filter sequences in FASTA/FASTQ file"
+        },
+        {
+          "name": "--fastq_stripleft",
+          "label": "\u5de6\u4fa7\u5207\u9664\u78b1\u57fa\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "0",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "delete given number of bases from the 5' end"
+        },
+        {
+          "name": "--fastq_stripright",
+          "label": "\u53f3\u4fa7\u5207\u9664\u78b1\u57fa\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "0",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "delete given number of bases from the 3' end"
+        },
+        {
+          "name": "--fastq_maxee_rate",
+          "label": "\u6700\u5927\u671f\u671b\u8bef\u5dee\u7387",
+          "type": "numeric",
+          "required": false,
+          "default": "0.01",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "discard if expected error rate is higher"
+        },
+        {
+          "name": "--fastaout",
+          "label": "\u8fc7\u6ee4\u540eFASTA\u8f93\u51fa",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "FASTA filename for passed sequences"
+        },
+        {
+          "name": "--fastq_maxlen",
+          "label": "\u6700\u5927\u5e8f\u5217\u957f\u5ea6",
+          "type": "numeric",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "discard if length of sequence is longer"
+        },
+        {
+          "name": "--fastq_minlen",
+          "label": "\u6700\u5c0f\u5e8f\u5217\u957f\u5ea6",
+          "type": "numeric",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "discard if length of sequence is shorter"
+        },
+        {
+          "name": "--fastq_maxns",
+          "label": "\u6700\u5927N\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "discard if number of N's is higher"
+        }
+      ]
+    },
+    {
+      "step": "4.1",
+      "name": "dereplication",
+      "software": "vsearch",
+      "query_status": "success",
+      "params": [
+        {
+          "name": "--derep_fulllength",
+          "label": "\u8f93\u5165\u8fc7\u6ee4\u540eFASTA",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "workflow",
+          "description": "dereplicate sequences in the given FASTA file"
+        },
+        {
+          "name": "--minuniquesize",
+          "label": "\u6700\u5c0f\u552f\u4e00\u5e8f\u5217\u4e30\u5ea6",
+          "type": "numeric",
+          "required": true,
+          "default": "8",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "minimum abundance for output from dereplication"
+        },
+        {
+          "name": "--sizeout",
+          "label": "\u8f93\u51fa\u4e30\u5ea6\u4fe1\u606f",
+          "type": "flag",
+          "required": false,
+          "default": "\u662f",
+          "options": [
+            "\u662f",
+            "\u5426"
+          ],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "write abundance annotation to output"
+        },
+        {
+          "name": "--relabel",
+          "label": "\u5e8f\u5217\u91cd\u547d\u540d\u524d\u7f00",
+          "type": "string",
+          "required": false,
+          "default": "Uni_",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "relabel with this prefix string"
+        },
+        {
+          "name": "--output",
+          "label": "\u552f\u4e00\u5e8f\u5217FASTA\u8f93\u51fa",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "output FASTA file (not for fastx_uniques)"
+        },
+        {
+          "name": "--strand",
+          "label": "\u94fe\u65b9\u5411",
+          "type": "select",
+          "required": false,
+          "default": "plus",
+          "options": [
+            "plus",
+            "both"
+          ],
+          "file_role": "input",
+          "source": "user",
+          "description": "dereplicate plus or both strands"
+        }
+      ]
+    },
+    {
+      "step": "4.2",
+      "name": "ASV clustering (denoise)",
+      "software": "usearch",
+      "query_status": "failed",
+      "params": []
+    },
+    {
+      "step": "4.3",
+      "name": "reference-based chimera removal",
+      "software": "vsearch",
+      "query_status": "success",
+      "params": [
+        {
+          "name": "--uchime_ref",
+          "label": "\u8f93\u5165ASV FASTA\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "workflow",
+          "description": "detect chimeras using a reference database"
+        },
+        {
+          "name": "--db",
+          "label": "\u53c2\u8003\u6570\u636e\u5e93\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "reference database for --uchime_ref"
+        },
+        {
+          "name": "--threads",
+          "label": "\u7ebf\u7a0b\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "0",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "number of threads to use, zero for all cores"
+        },
+        {
+          "name": "--nonchimeras",
+          "label": "\u975e\u5d4c\u5408\u4f53ASV\u8f93\u51fa",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "output non-chimeric sequences to file"
+        },
+        {
+          "name": "--chimeras",
+          "label": "\u5d4c\u5408\u4f53\u5e8f\u5217\u8f93\u51fa",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "output chimeric sequences to file"
+        },
+        {
+          "name": "--abskew",
+          "label": "\u6700\u5c0f\u4e30\u5ea6\u6bd4\u7387",
+          "type": "numeric",
+          "required": false,
+          "default": "2.0",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "minimum abundance ratio"
+        },
+        {
+          "name": "--relabel",
+          "label": "\u5e8f\u5217\u91cd\u547d\u540d\u524d\u7f00",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "relabel nonchimeras with this prefix string"
+        },
+        {
+          "name": "--sizeout",
+          "label": "\u8f93\u51fa\u4e30\u5ea6\u4fe1\u606f",
+          "type": "flag",
+          "required": false,
+          "default": "\u662f",
+          "options": [
+            "\u662f",
+            "\u5426"
+          ],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "include abundance information when relabelling"
+        }
+      ]
+    },
+    {
+      "step": "5.1",
+      "name": "feature table generation",
+      "software": "vsearch",
+      "query_status": "success",
+      "params": [
+        {
+          "name": "--usearch_global",
+          "label": "\u8f93\u5165\u8fc7\u6ee4\u540eFASTA",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "workflow",
+          "description": "filename of queries for global alignment search"
+        },
+        {
+          "name": "--db",
+          "label": "ASV\u6570\u636e\u5e93\u6587\u4ef6",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "input",
+          "source": "workflow",
+          "description": "FASTA or UDB database"
+        },
+        {
+          "name": "--id",
+          "label": "\u76f8\u4f3c\u5ea6\u9608\u503c",
+          "type": "numeric",
+          "required": false,
+          "default": "0.97",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "reject if identity lower"
+        },
+        {
+          "name": "--threads",
+          "label": "\u7ebf\u7a0b\u6570",
+          "type": "numeric",
+          "required": false,
+          "default": "0",
+          "options": [],
+          "file_role": "input",
+          "source": "user",
+          "description": "number of threads to use, zero for all cores"
+        },
+        {
+          "name": "--otutabout",
+          "label": "OTU\u8868\u8f93\u51fa",
+          "type": "string",
+          "required": true,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "filename for OTU table output in classic format"
+        },
+        {
+          "name": "--biomout",
+          "label": "BIOM\u683c\u5f0fOTU\u8868\u8f93\u51fa",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "filename for OTU table output in biom 1.0 format"
+        },
+        {
+          "name": "--mothur_shared_out",
+          "label": "Mothur\u683c\u5f0fOTU\u8868\u8f93\u51fa",
+          "type": "string",
+          "required": false,
+          "default": "",
+          "options": [],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "filename for OTU table output in mothur format"
+        },
+        {
+          "name": "--strand",
+          "label": "\u94fe\u65b9\u5411",
+          "type": "select",
+          "required": false,
+          "default": "plus",
+          "options": [
+            "plus",
+            "both"
+          ],
+          "file_role": "input",
+          "source": "user",
+          "description": "search plus or both strands"
+        },
+        {
+          "name": "--sizeout",
+          "label": "\u8f93\u51fa\u4e30\u5ea6\u4fe1\u606f",
+          "type": "flag",
+          "required": false,
+          "default": "\u662f",
+          "options": [
+            "\u662f",
+            "\u5426"
+          ],
+          "file_role": "output",
+          "source": "workflow",
+          "description": "write abundance annotation to dbmatched file"
+        }
+      ]
+    }
+  ]
+}

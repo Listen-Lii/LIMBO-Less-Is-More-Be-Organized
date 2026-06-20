@@ -1,0 +1,12 @@
+{
+  "--fastq_mergepairs": "1",
+  "--reverse": "2",
+  "--fastqout": "workflow/2_1_fastqout.fastq",
+  "--fastaout": "workflow/2_1_fastaout.fasta",
+  "--relabel": "workflow/2_1_relabel.txt",
+  "--fastq_minlen": "1",
+  "--fastq_maxee": "",
+  "--fastq_maxdiffs": "10",
+  "--fastq_maxns": "",
+  "_env_path": "<PROJECT_DIR>/bioinfo_env"
+}
